@@ -1,5 +1,5 @@
 data = {}
-data.sheets = null // initialize to null so we can check from ui.init()
+data.sheets = []
 data.Sheet = function () { // each element in data.sheets has its prototype set to this
     this.file = {} // file object to be re-retrieved upon load by a FileReader
     /*
