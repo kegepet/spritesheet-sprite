@@ -1,0 +1,142 @@
+
+/*
+spritesheet-sprite spritesheet: ./spritesheet-sprite.png
+*/
+body {
+    background-color: #474747;
+}
+.overlay, #main {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    min-width: 800px;
+}
+.overlay {
+    background-color: blue;
+    transition: opacity 0.2s;
+    transition-timing-function : ease-in;
+}
+
+.overlay.off {
+    opacity: 0
+}
+
+.overlay#filedrop {
+    pointer-events: none;
+}
+
+.modal {
+    width: 400px;
+    height: 130px;
+    background-color: purple;
+    padding: 10px 20px;
+    position: absolute;
+    text-align: right;
+}
+
+.modal * {
+    display: inline-block;
+}
+
+.modal .message {
+    color: white;
+    font-size: 0.9em;
+    width: 100%;
+    height: 85px;
+    text-align: left;
+}
+
+.modal .choice {
+    width: 80px;
+    height: 30px;
+    margin: 2px 5px;
+    background-color: #dbb7ff;
+    text-align: center;
+    color: black;
+}
+
+.modal .choice:hover {
+    background-color: #ead6ff;
+}
+
+#main {
+    background-color:  rgb(82, 82, 82);
+}
+#tabs {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50px;
+    background-color: rgb(27, 27, 27);
+    overflow: hidden;
+    white-space: none;
+}
+.tab {
+    width: 130px;
+    min-width: 90px;
+    height: 30px;
+    margin-top: 20px;
+    margin-right: 1px;
+    padding: 7px 10px;
+    color: #fff;
+    font-size: 0.9em;
+    text-align: center;
+    background-color: #686868;
+    display: inline-block;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    cursor: default;
+    user-select: none;
+    border-radius: 7px 7px 0 0;
+}
+.tab.current {
+    background-color: #878787;
+}
+.tab.selected {
+    background-color: #906f99;
+}
+.tab.current.selected {
+    background-color: #bd91c9;
+}
+#sheets {
+    position: absolute;
+    top: 50px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    
+}
+.sheet {
+    position: relative;
+    height: 100%;
+    display: none;
+}
+.sheet.current {
+    display: block;
+}
+.sheet > * {
+    box-sizing: content-box;
+}
+.stage {
+    overflow: scroll;
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 200px;
+    bottom: 0;
+}
+.panel {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 200px;
+    border-left: solid 1px #ccc
+}
+
+
+/* overlay messages */
