@@ -31,7 +31,8 @@ data.add = function (file) {
     return data.sheets[i-1]
 }
 data.remove = function (sheet) {
-
+    // sheet is a reference to one of the items in data.sheets
+    data.sheets.splice(data.sheets.indexOf(sheet), 1)
 }
 data.update = function (sheet, value=null) {
 
@@ -112,13 +113,14 @@ ui.newTab = function (file) {
     t.data = d
     // tab and sheet should hold reference to one another
     t.sheet = s
-    sheet.tab = t
+    s.tab = t
     t.addEventListener('mousedown', ui.selectTabs)
     s.setClass = t.setClass = function (classname, tf) {
         this.className = this.className.replace(new RegExp(' *'+classname, 'g'), '')
         if (tf) this.className += this.className ? ' '+classname : classname
     }
     t.innerText = d.file.name
+    t.setAttribute('title', d.file.name)
     document.querySelector('#tabs').appendChild(t)
     ui.selectTabs(t)
 }
@@ -137,11 +139,14 @@ ui.switchTab = function (tab, skipLast=false) {
     ui.current = tab
 }
 
-ui.closeTabs = function (tabs) {
-    // takes an array of indices
-    // calls data.update with a value of 0
-    // that causes data.update purge the item
-
+ui.closeTabs = function (tab=null) {
+    var toX = tab ? [tab] : document.body.querySelectorAll('.tab.selected')
+    for (var i=0; i < toX.length; i++) {
+        data.remove(toX[i].data)
+        toX[i].sheet.parentNode.removeChild(toX[i].sheet)
+        toX[i].parentNode.removeChild(toX[i])
+    }
+    ui.selectTabs(document.body.querySelector('.tab.selected') || document.body.querySelector('.tab'))
 }
 
 ui.anchor = null
@@ -155,7 +160,7 @@ ui.selectTabs = function (x) {
     var sk = me && x.shiftKey
     var tabs = document.body.querySelectorAll('.tab')
     if (!me || !ck) {
-        !ck && [].forEach.call(tabs, function (i) {
+        [].forEach.call(tabs, function (i) {
             i.setClass('selected', false)
         })
     }
@@ -175,7 +180,6 @@ ui.selectTabs = function (x) {
         else if (!/selected/.test(target.className)) return
     }
     target.setClass('selected', true)
-    console.log(target.className)
     ui.switchTab(target, ck || sk)
 }
 
@@ -203,13 +207,14 @@ ui.main.addEventListener('drop', function (e) {
 window.addEventListener('keydown', function (e) {
     
     // check reserved
-    if (!/[\[\]\\]/.test(e.key)) return
+    if (!/[\[\]\\w]/.test(e.key)) return
     e.preventDefault()
     //e.stopPropagation()
-    if (!((/mac/i.test(navigator.platform) && e.metaKey) || e.ctrlKey)) return
+    if (!((/mac/i.test(navigator.platform) && e.metaKey) || e.ctrlKey || e.altKey)) return
 
     if (!ui.current) return
     if (e.key == '[') ui.selectTabs(ui.current.previousSibling || ui.current.parentNode.lastChild)
     if (e.key == ']') ui.selectTabs(ui.current.nextSibling || ui.current.parentNode.firstChild)
     if (e.key == '\\') ui.selectTabs(ui.last)
+    if (e.altKey && (e.key == 'w')) ui.closeTabs()
 })
