@@ -21,6 +21,10 @@ data.Sheet = function () { // each element in data.sheets has its prototype set 
     this.guidelines_v = []
     this.guidelines_on = true
 }
+data.Sheet.prototype.update = function (k, v) {
+    this[k] = v
+    data.mtime = Date.now()
+}
 data.stringify = function () {
     // will return the stringified JSON string
 }
@@ -28,18 +32,26 @@ data.add = function (file) {
     // create new entry in data.sheets, returns ref to new entry
     var i = data.sheets.push(new data.Sheet())
     data.sheets[i-1].file = file
+    data.mtime = Date.now()
     return data.sheets[i-1]
 }
 data.remove = function (sheet) {
     // sheet is a reference to one of the items in data.sheets
     data.sheets.splice(data.sheets.indexOf(sheet), 1)
-}
-data.update = function (sheet, value=null) {
-
+    data.mtime = Date.now()
 }
 data.reorder = function () {
     // the tab order is synced with data.sheets order
     // when tabs are rearranged, we must reorder data.sheets
+}
+data.mtime = Date.now() // the modified time of the data.sheets
+data.stime = data.mtime // the last time saved
+data.save = function () {
+    data.timeout && clearTimeout(data.timeout)
+    data.timeout = setTimeout(data.save, 5000)
+    if (data.mtime <= data.stime) return
+    localStorage.setItem('spritesheet-sprite', JSON.stringify(data.sheets))
+    data.stime = Date.now()    
 }
 data.init = function () {
     // create localStorage object if one does not exist
@@ -51,6 +63,8 @@ data.init = function () {
     }
     try { data.sheets = JSON.parse(localStorage.getItem('spritesheet-sprite')) }
     catch (err) { data.sheets = [] }
+    // get the autosave going
+    data.save()
 }()
 
 
@@ -104,12 +118,12 @@ ui.openModal = function (message, choices, callback) {
 
 ui.newTab = function (file) {
     // if no file is passed, it will open the default filedrop tab
-    //console.log(file.name)
     var d = data.add(file)
     var s = ui.sheet.create(d)
     document.querySelector('#sheets').appendChild(s)
     // create new tab
-    var t = document.querySelector('template#tab').content.querySelector('.tab').cloneNode(true)
+    var t = document.createElement('div')
+    t.className = 'tab'
     t.data = d
     // tab and sheet should hold reference to one another
     t.sheet = s
@@ -128,7 +142,6 @@ ui.newTab = function (file) {
 ui.current = null
 ui.last = null // because ctrl+\ will revert to previous tab
 ui.switchTab = function (tab, skipLast=false) {
-    //console.log(tab.data.file.name)
     if (ui.current) {
         ui.current.setClass('current', false)
         ui.current.sheet.setClass('current', false)
@@ -141,12 +154,14 @@ ui.switchTab = function (tab, skipLast=false) {
 
 ui.closeTabs = function (tab=null) {
     var toX = tab ? [tab] : document.body.querySelectorAll('.tab.selected')
+    var newCur = toX[toX.length-1].nextSibling || toX[0].previousSibling
     for (var i=0; i < toX.length; i++) {
         data.remove(toX[i].data)
         toX[i].sheet.parentNode.removeChild(toX[i].sheet)
         toX[i].parentNode.removeChild(toX[i])
     }
-    ui.selectTabs(document.body.querySelector('.tab.selected') || document.body.querySelector('.tab'))
+    ui.current = ui.current.parentNode ? ui.current : null
+    newCur && ui.selectTabs(newCur)
 }
 
 ui.anchor = null
@@ -209,12 +224,11 @@ window.addEventListener('keydown', function (e) {
     // check reserved
     if (!/[\[\]\\w]/.test(e.key)) return
     e.preventDefault()
-    //e.stopPropagation()
-    if (!((/mac/i.test(navigator.platform) && e.metaKey) || e.ctrlKey || e.altKey)) return
+    var control = (/mac/i.test(navigator.platform) && e.metaKey) || e.ctrlKey
 
     if (!ui.current) return
-    if (e.key == '[') ui.selectTabs(ui.current.previousSibling || ui.current.parentNode.lastChild)
-    if (e.key == ']') ui.selectTabs(ui.current.nextSibling || ui.current.parentNode.firstChild)
-    if (e.key == '\\') ui.selectTabs(ui.last)
-    if (e.altKey && (e.key == 'w')) ui.closeTabs()
+    if (control && e.key == '[') ui.selectTabs(ui.current.previousSibling || ui.current.parentNode.lastChild)
+    else if (control && e.key == ']') ui.selectTabs(ui.current.nextSibling || ui.current.parentNode.firstChild)
+    else if (control && e.key == '\\') ui.selectTabs(ui.last || ui.current)
+    else if (e.altKey && (e.key == 'w')) ui.closeTabs()
 })
