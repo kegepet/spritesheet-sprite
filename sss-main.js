@@ -161,6 +161,8 @@ ui.closeTabs = function (tab=null) {
         toX[i].parentNode.removeChild(toX[i])
     }
     ui.current = ui.current.parentNode ? ui.current : null
+    // and in case there is no previousSibling either...
+    newCur = newCur || document.body.querySelector('.tab')
     newCur && ui.selectTabs(newCur)
 }
 
