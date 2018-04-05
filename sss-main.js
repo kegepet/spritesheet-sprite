@@ -128,13 +128,28 @@ ui.newTab = function (file) {
     // tab and sheet should hold reference to one another
     t.sheet = s
     s.tab = t
-    t.addEventListener('mousedown', ui.selectTabs)
+    t.addEventListener('mousedown', function (e) {
+        ui.selectTabs(e)
+        ui.arrangeTabs(e)
+    })
+    t.addEventListener('mouseup', ui.selectTabs)
     s.setClass = t.setClass = function (classname, tf) {
         this.className = this.className.replace(new RegExp(' *'+classname, 'g'), '')
         if (tf) this.className += this.className ? ' '+classname : classname
     }
+    t.x = function (to=null) {
+        if (to != null) {
+            this.int_x = to
+            this.style.left = to + 'px'
+        }
+        else this.int_x = 'int_x' in this ? this.int_x : parseInt(window.getComputedStyle(this).left)
+        return this.int_x
+    }
     t.innerText = d.file.name
     t.setAttribute('title', d.file.name)
+    var tabs = document.querySelectorAll('.tab')
+    var ts = tabs.length && window.getComputedStyle(tabs[0])
+    t.style.left = (tabs.length * (parseInt(ts.width) + parseInt(ts.marginRight))) + 'px'
     document.querySelector('#tabs').appendChild(t)
     ui.selectTabs(t)
 }
@@ -155,10 +170,16 @@ ui.switchTab = function (tab, skipLast=false) {
 ui.closeTabs = function (tab=null) {
     var toX = tab ? [tab] : document.body.querySelectorAll('.tab.selected')
     var newCur = toX[toX.length-1].nextSibling || toX[0].previousSibling
-    for (var i=0; i < toX.length; i++) {
-        data.remove(toX[i].data)
-        toX[i].sheet.parentNode.removeChild(toX[i].sheet)
-        toX[i].parentNode.removeChild(toX[i])
+    for (var i=0, item; item=toX[i]; i++) {
+        data.remove(item.data)
+        item.sheet.parentNode.removeChild(item.sheet)
+        item.parentNode.removeChild(item)
+    }
+    // move to new positions
+    var tabs = document.body.querySelectorAll('.tab')
+    var ts = tabs.length && window.getComputedStyle(tabs[0])
+    for (var i=0, item; item=tabs[i]; i++) {
+        item.x(i * (parseInt(ts.width) + parseInt(ts.marginRight)))
     }
     ui.current = ui.current.parentNode ? ui.current : null
     // and in case there is no previousSibling either...
@@ -166,20 +187,100 @@ ui.closeTabs = function (tab=null) {
     newCur && ui.selectTabs(newCur)
 }
 
-ui.anchor = null
+
+ui.arrangeTabs = function (e) {
+    var zeroX = e.screenX // to check whether stickiness gets unstuck
+    var offsetX = e.offsetX
+    var anim = false
+    var tabdrag = false
+    var tabs = document.body.querySelectorAll('.tab')
+    var sels = document.body.querySelectorAll('.tab.selected')
+    var toX = false
+    var tabStyle = window.getComputedStyle(tabs[0])
+    var tabW = parseInt(tabStyle.width)
+    var tabMR = parseInt(tabStyle.marginRight)
+    // the bunch-up
+    var tabsTo = []
+    for (var i=0, q=[], x=-1; i<tabs.length; i++) {
+        if (tabs[i] == e.target) x = tabsTo.length
+        if (/selected/.test(tabs[i].className)) q.push(tabs[i])
+        else tabsTo.push(tabs[i])
+        while (x > -1 && q.length) {
+            tabsTo.splice(x++, 0, q.shift())
+        }
+    }
+    // the mousemove function
+    var mm = function (e) {
+        if (anim) return
+        anim = true
+        window.requestAnimationFrame(function () {
+            anim = false
+            tabdrag = tabdrag || (Math.abs(e.screenX - zeroX) > 7)
+            if (!tabdrag) return
+            if (!toX) {
+                for (var i=0; i<tabsTo.length; i++) {
+                    tabsTo[i].x(i * (tabW + tabMR))
+                }
+                toX = true
+            }
+            var iott = tabsTo.indexOf(this) // index of target
+            for (var i=0, t; t=tabs[i]; i++) {
+                var ioct = tabsTo.indexOf(t) // index of current tab
+                if (/selected/.test(t.className)) {
+                    t.x((e.pageX - offsetX) + ((ioct - iott) * (tabW + tabMR)))
+                }
+                else if (ioct < tabsTo.indexOf(sels[0]) &&
+                sels[0].x() < t.x() + (tabW * 0.4)) {
+                    tabsTo.splice(ioct+sels.length,0,tabsTo.splice(ioct,1)[0])
+                    toX = false
+                }
+                else if (ioct > tabsTo.indexOf(sels[sels.length-1]) &&
+                (sels[sels.length-1].x() + tabW) > t.x() + (tabW * 0.6)) {
+                    tabsTo.splice(ioct-sels.length,0,tabsTo.splice(ioct,1)[0])
+                    toX = false
+                }
+            }
+        }.bind(this))
+    }.bind(e.target)
+    window.addEventListener('mousemove', mm)
+    window.addEventListener('mouseup', function (e) {
+        window.removeEventListener('mousemove', mm)
+        window.removeEventListener('mouseup', arguments.callee)
+        if (tabdrag) e.stopPropagation()
+        else return
+        tabdrag = false
+        zeroX = e.screenX
+        // apply tabsTo to DOM
+        var df = document.createDocumentFragment()
+        for (var i=0; i<tabsTo.length; i++) {
+            df.appendChild(tabsTo[i])
+            tabsTo[i].x(i * (tabW + tabMR))
+        }
+        document.querySelector('#tabs').appendChild(df)
+
+    }, true)
+}
+
+
 ui.selectTabs = function (x) {
     // x can be either a MouseEvent or a reference to a tab
     var me = x.constructor == MouseEvent
     var target = me ? x.target : x
-    if (document.body.querySelectorAll('.selected').length==1 &&
-        /current/.test(target.className)) return
     var ck = me && (x.ctrlKey || (/mac/i.test(navigator.platform) && x.metaKey))
     var sk = me && x.shiftKey
+    var selected = /selected/.test(target.className)
+    var current = /current/.test(target.className)
     var tabs = document.body.querySelectorAll('.tab')
+    // if only one tab is selected and the target is that one, nothign to do--return
+    if (document.body.querySelectorAll('.selected').length==1 && current) return
+    // if you mouse down on a selected tab without holding shift or control, return
+    // only arrangeTabs does anything in that case
+    if (me && x.type=='mousedown' && !ck && !sk && selected) return
+    if (me && x.type=='mouseup' && !selected) return
     if (!me || !ck) {
-        [].forEach.call(tabs, function (i) {
-            i.setClass('selected', false)
-        })
+        for (var i=0, item; item=tabs[i]; i++) {
+            item.setClass('selected', false)
+        }
     }
     if (sk) {
         for (var i=0, sel=0; sel < 2; i++) {
@@ -190,16 +291,21 @@ ui.selectTabs = function (x) {
     }
     else ui.anchor = target
     if (!sk && ck) {
-        target.setClass('selected', !/selected/.test(target.className))
-        if (/current/.test(target.className)) {
+        target.setClass('selected', !selected)
+        if (current) {
             target = document.body.querySelector('.selected') // left-most selected tab
         }
-        else if (!/selected/.test(target.className)) return
+        else if (!selected) return
     }
     target.setClass('selected', true)
     ui.switchTab(target, ck || sk)
 }
 
+
+
+document.querySelector('#tabs').addEventListener('wheel', function (e) {
+    this.scrollLeft += (1 * e.deltaY)
+})
 
 ui.main = document.querySelector('#main')
 ui.main.addEventListener('dragenter', function (e) {
@@ -217,20 +323,18 @@ ui.main.addEventListener('drop', function (e) {
     if (!e.dataTransfer.files) {
         return
     }
-    [].forEach.call(e.dataTransfer.files, function (item) {
+    for (var i=0, item; item=e.dataTransfer.files[i]; i++) {
         ui.newTab(item)
-    })
+    }
 })
 window.addEventListener('keydown', function (e) {
-    
     // check reserved
-    if (!/[\[\]\\w]/.test(e.key)) return
+    if (!/[\[\]\\w]/i.test(e.key)) return
     e.preventDefault()
     var control = (/mac/i.test(navigator.platform) && e.metaKey) || e.ctrlKey
-
     if (!ui.current) return
-    if (control && e.key == '[') ui.selectTabs(ui.current.previousSibling || ui.current.parentNode.lastChild)
-    else if (control && e.key == ']') ui.selectTabs(ui.current.nextSibling || ui.current.parentNode.firstChild)
-    else if (control && e.key == '\\') ui.selectTabs(ui.last || ui.current)
-    else if (e.altKey && (e.key == 'w')) ui.closeTabs()
+    if (e.altKey && e.key == '[') ui.selectTabs(ui.current.previousSibling || ui.current.parentNode.lastChild)
+    else if (e.altKey && e.key == ']') ui.selectTabs(ui.current.nextSibling || ui.current.parentNode.firstChild)
+    else if (e.altKey && e.key == '\\') ui.selectTabs(ui.last || ui.current)
+    else if (e.altKey && /w/i.test(e.key)) ui.closeTabs()
 })
