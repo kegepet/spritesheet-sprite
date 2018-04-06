@@ -40,9 +40,11 @@ data.remove = function (sheet) {
     data.sheets.splice(data.sheets.indexOf(sheet), 1)
     data.mtime = Date.now()
 }
-data.reorder = function () {
+data.reorder = function (sheetsTo) {
     // the tab order is synced with data.sheets order
     // when tabs are rearranged, we must reorder data.sheets
+    data.sheets = sheetsTo
+    data.mtime = Date.now()
 }
 data.mtime = Date.now() // the modified time of the data.sheets
 data.stime = data.mtime // the last time saved
@@ -193,12 +195,12 @@ ui.arrangeTabs = function (e) {
     var offsetX = e.offsetX
     var anim = false
     var tabdrag = false
+    var bunched = false
     var tabs = document.body.querySelectorAll('.tab')
     var sels = document.body.querySelectorAll('.tab.selected')
     var toX = false
     var tabStyle = window.getComputedStyle(tabs[0])
-    var tabW = parseInt(tabStyle.width)
-    var tabMR = parseInt(tabStyle.marginRight)
+    var tabW = parseInt(tabStyle.width)+parseInt(tabStyle.marginRight)
     // the bunch-up
     var tabsTo = []
     for (var i=0, q=[], x=-1; i<tabs.length; i++) {
@@ -209,25 +211,29 @@ ui.arrangeTabs = function (e) {
             tabsTo.splice(x++, 0, q.shift())
         }
     }
-    // the mousemove function
+    var minX = e.pageX - (tabW*tabsTo.indexOf(sels[0]))
+    var maxX = e.pageX + ((tabW*tabsTo.length)-(tabW*(tabsTo.indexOf(sels[sels.length-1])+1)))
+    // mousemove handler
     var mm = function (e) {
         if (anim) return
         anim = true
         window.requestAnimationFrame(function () {
             anim = false
             tabdrag = tabdrag || (Math.abs(e.screenX - zeroX) > 7)
-            if (!tabdrag) return
+            if (!tabdrag || tabdrag=='cancel') return
             if (!toX) {
                 for (var i=0; i<tabsTo.length; i++) {
-                    tabsTo[i].x(i * (tabW + tabMR))
+                    if (bunched && /selected/.test(tabsTo[i].className)) continue
+                    tabsTo[i].x(i*tabW)
                 }
-                toX = true
+                bunched = true, toX = true
             }
-            var iott = tabsTo.indexOf(this) // index of target
             for (var i=0, t; t=tabs[i]; i++) {
+                var iott = tabsTo.indexOf(this) // index of target
                 var ioct = tabsTo.indexOf(t) // index of current tab
                 if (/selected/.test(t.className)) {
-                    t.x((e.pageX - offsetX) + ((ioct - iott) * (tabW + tabMR)))
+                    //t.x((e.pageX - offsetX) + ((ioct - iott) * tabW))
+                    t.x((Math.max(minX,Math.min(maxX,e.pageX))-offsetX)+((ioct-iott)*tabW))
                 }
                 else if (ioct < tabsTo.indexOf(sels[0]) &&
                 sels[0].x() < t.x() + (tabW * 0.4)) {
@@ -242,23 +248,26 @@ ui.arrangeTabs = function (e) {
             }
         }.bind(this))
     }.bind(e.target)
-    window.addEventListener('mousemove', mm)
-    window.addEventListener('mouseup', function (e) {
+    // mouseup handler
+    var mu = function (e) {
         window.removeEventListener('mousemove', mm)
-        window.removeEventListener('mouseup', arguments.callee)
-        if (tabdrag) e.stopPropagation()
-        else return
-        tabdrag = false
-        zeroX = e.screenX
+        window.removeEventListener('mouseup', mu, true)
+        if (!tabdrag) return
+        e.stopPropagation()
+        tabdrag = 'cancel'
         // apply tabsTo to DOM
         var df = document.createDocumentFragment()
+        var sheetsTo = []
         for (var i=0; i<tabsTo.length; i++) {
             df.appendChild(tabsTo[i])
-            tabsTo[i].x(i * (tabW + tabMR))
+            tabsTo[i].x(i*tabW)
+            sheetsTo.push(tabsTo[i].data)
         }
         document.querySelector('#tabs').appendChild(df)
-
-    }, true)
+        data.reorder(sheetsTo)
+    }
+    window.addEventListener('mousemove', mm)
+    window.addEventListener('mouseup', mu, true)
 }
 
 
