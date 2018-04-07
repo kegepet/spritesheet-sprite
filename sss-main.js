@@ -131,6 +131,7 @@ ui.newTab = function (file) {
     t.sheet = s
     s.tab = t
     t.addEventListener('mousedown', function (e) {
+        e.preventDefault()
         ui.selectTabs(e)
         ui.arrangeTabs(e)
     })
@@ -151,8 +152,18 @@ ui.newTab = function (file) {
     t.setAttribute('title', d.file.name)
     var tabs = document.querySelectorAll('.tab')
     var ts = tabs.length && window.getComputedStyle(tabs[0])
-    t.style.left = (tabs.length * (parseInt(ts.width) + parseInt(ts.marginRight))) + 'px'
+    t.x(tabs.length * (parseInt(ts.width) + parseInt(ts.marginRight)))
     document.querySelector('#tabs').appendChild(t)
+    /*
+    #tabs-spacer prevents a problem which occurs when you
+    drag a range to the end of the tabs area, and the last
+    tab moves out of place, which causes the scrollable
+    area to shorten for a moment, messing everything up.
+    #tabs-spacer maintains the scrollable areas size when
+    dragging tabs around.
+    */
+    document.querySelector('#tabs-spacer').style.width = t.x() + parseInt(ts.width) + parseInt(ts.marginRight) + 'px'
+    console.log(document.querySelector('#tabs-spacer').style.width)
     ui.selectTabs(t)
 }
 
@@ -183,6 +194,8 @@ ui.closeTabs = function (tab=null) {
     for (var i=0, item; item=tabs[i]; i++) {
         item.x(i * (parseInt(ts.width) + parseInt(ts.marginRight)))
     }
+    // resize #tabs-spacer
+    document.querySelector('#tabs-spacer').style.width = tabs.length*(parseInt(ts.width)+parseInt(ts.marginRight)) + 'px'
     ui.current = ui.current.parentNode ? ui.current : null
     // and in case there is no previousSibling either...
     newCur = newCur || document.body.querySelector('.tab')
@@ -211,8 +224,8 @@ ui.arrangeTabs = function (e) {
             tabsTo.splice(x++, 0, q.shift())
         }
     }
-    var minX = e.pageX - (tabW*tabsTo.indexOf(sels[0]))
-    var maxX = e.pageX + ((tabW*tabsTo.length)-(tabW*(tabsTo.indexOf(sels[sels.length-1])+1)))
+    var minX = (e.pageX+e.target.parentNode.scrollLeft)-(tabW*tabsTo.indexOf(sels[0]))
+    var maxX = (e.pageX+e.target.parentNode.scrollLeft)+((tabW*tabsTo.length)-(tabW*(tabsTo.indexOf(sels[sels.length-1])+1)))
     // mousemove handler
     var mm = function (e) {
         if (anim) return
@@ -233,7 +246,7 @@ ui.arrangeTabs = function (e) {
                 var ioct = tabsTo.indexOf(t) // index of current tab
                 if (/selected/.test(t.className)) {
                     //t.x((e.pageX - offsetX) + ((ioct - iott) * tabW))
-                    t.x((Math.max(minX,Math.min(maxX,e.pageX))-offsetX)+((ioct-iott)*tabW))
+                    t.x((Math.max(minX,Math.min(maxX,(e.pageX+this.parentNode.scrollLeft)))-offsetX)+((ioct-iott)*tabW))
                 }
                 else if (ioct < tabsTo.indexOf(sels[0]) &&
                 sels[0].x() < t.x() + (tabW * 0.4)) {
@@ -312,9 +325,14 @@ ui.selectTabs = function (x) {
 
 
 
-document.querySelector('#tabs').addEventListener('wheel', function (e) {
-    this.scrollLeft += (1 * e.deltaY)
-})
+
+//ui.tabBox = document.querySelector('#tabs')
+
+ui.scrollTabs = function (e) {
+    this.scrollLeft += (50*(e.deltaY/Math.abs(e.deltaY)))    
+}
+document.querySelector('#tabs').addEventListener('wheel', ui.scrollTabs)
+
 
 ui.main = document.querySelector('#main')
 ui.main.addEventListener('dragenter', function (e) {
