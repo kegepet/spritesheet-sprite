@@ -151,23 +151,23 @@ the scrollable areas size when dragging tabs around.
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
-    background: linear-gradient(135deg,transparent 4px, #686868 0);
+    background: linear-gradient(225deg,transparent 4px, #686868 0);
     /*border-radius: 7px 7px 0 0;*/
     /*transition: left 0.2s;*/
 }
 .tab.current {
     background-color: #878787;
-    background: linear-gradient(135deg,transparent 4px, #878787 0);
+    background: linear-gradient(225deg,transparent 4px, #878787 0);
 }
 .tab.selected {
     background-color: #906f99;
-    background: linear-gradient(135deg,transparent 4px, #906f99 0);
+    background: linear-gradient(225deg,transparent 4px, #906f99 0);
     color: #fff;
     z-index: 99;
 }
 .tab.current.selected {
     background-color: #bd91c9;
-    background: linear-gradient(135deg,transparent 4px, #bd91c9 0);
+    background: linear-gradient(225deg,transparent 4px, #bd91c9 0);
 }
 #sheets {
     position: absolute;

@@ -36,17 +36,8 @@ ui.sheet.create = function (dataref) {
     for (var i in ui.sheet.panel) {
         sheet.panel[i] = ui.sheet.panel[i]
     }
-    //sheet.stage.innerText = sheet.data.file.name
-    // filereader
-    var fr = new FileReader()
-
-    fr.addEventListener('load', function (e) {
-        var img = document.createElement('img')
-        //console.log(e.total/1000 + 'KB')
-        img.src = fr.result;
-        sheet.stage.appendChild(img)
-    })
-    //console.log(sheet.data)
-    fr.readAsDataURL(sheet.data.file)
+    var img = document.createElement('img')
+    img.src = sheet.data.image.dataURL
+    sheet.stage.appendChild(img)
     return sheet
 }

@@ -1,7 +1,12 @@
 data = {}
 data.sheets = []
-data.Sheet = function (file) { // each element in data.sheets has its prototype set to this
-    this.file = file // file object to be re-retrieved upon load by a FileReader
+data.Sheet = function () { // each element in data.sheets has its prototype set to this
+    this.image = {
+        dataURL: '',
+        name: '',
+        type: '',
+        size: ''
+    }
     /*
     The next three are relational.
     e.g.
@@ -25,11 +30,20 @@ data.Sheet.prototype.update = function (k, v) {
     this[k] = v
     data.mtime = Date.now()
 }
-data.add = function (file) {
-    // create new entry in data.sheets, returns ref to new entry
-    var i = data.sheets.push(new data.Sheet(file))
-    data.mtime = Date.now()
-    return data.sheets[i-1]
+data.add = function (file, callback) {
+    var s = data.sheets[data.sheets.push(new data.Sheet())-1]
+    var fr = new FileReader()
+    fr.addEventListener('load', function (e) {
+        //console.log(e.total/1000 + 'KB')
+        s.update('image', {
+            dataURL: fr.result,
+            name: file.name,
+            type: file.type,
+            size: e.total
+        })
+        callback(s)
+    })
+    fr.readAsDataURL(file)
 }
 data.remove = function (sheet) {
     // sheet is a reference to one of the items in data.sheets
@@ -48,8 +62,15 @@ data.save = function () {
     data.timeout && clearTimeout(data.timeout)
     data.timeout = setTimeout(data.save, 5000)
     if (data.mtime <= data.stime) return
-    localStorage.setItem('spritesheet-sprite', JSON.stringify(data.sheets))
-    data.stime = Date.now()
+    try {
+        localStorage.setItem('spritesheet-sprite', JSON.stringify(data.sheets))
+        data.stime = Date.now()
+    }
+    catch (e) {
+        // for now, do nothing
+        console.log('storage quota full')
+        data.stime = Date.now()
+    }    
 }
 data.init = function () {
     // create localStorage object if one does not exist
@@ -57,10 +78,13 @@ data.init = function () {
     // populate data.sheets
     if (!('spritesheet-sprite' in localStorage)) {
         localStorage.setItem('spritesheet-sprite', '')
-        return
     }
-    try { data.sheets = JSON.parse(localStorage.getItem('spritesheet-sprite')) }
-    catch (err) { data.sheets = [] }
+    try {
+        data.sheets = JSON.parse(localStorage.getItem('spritesheet-sprite'))
+    }
+    catch (err) {
+        data.sheets = []
+    }
     // get the autosave going
     data.save()
 }()
@@ -85,7 +109,7 @@ ui.openAlert = function (template_id, ttl=0) {
     ttl && setTimeout(ov.remove.bind(ov), ttl*1000)
 }
 
-ui.openModal = function (message, choices, callback) {
+ui.openModal = function (message, choices, callback, context=document.body) {
     // choices is an array with each item a button value
     // the callback will be passed the selected index from the choices array
     var o = document.createElement('div')
@@ -108,19 +132,22 @@ ui.openModal = function (message, choices, callback) {
         })
         m.appendChild(b)
     }
-    document.body.appendChild(o)
+    context.appendChild(o)
 }
 
 
 // TAB STUFF
 
-ui.newTab = function (sheet) {
-    var s = ui.sheet.create(sheet)
+ui.newTab = function (x) {
+    if (x.constructor == File) {
+        data.add(x, ui.newTab)
+        return
+    }
+    var s = ui.sheet.create(x)
     document.querySelector('#sheets').appendChild(s)
     // create new tab
     var t = document.createElement('div')
     t.className = 'tab'
-    t.data = sheet
     // tab and sheet should hold reference to one another
     t.sheet = s
     s.tab = t
@@ -142,8 +169,8 @@ ui.newTab = function (sheet) {
         else this.int_x = 'int_x' in this ? this.int_x : parseInt(window.getComputedStyle(this).left)
         return this.int_x
     }
-    t.innerText = sheet.file.name
-    t.setAttribute('title', sheet.file.name)
+    t.innerText = x.image.name
+    t.setAttribute('title', x.image.name)
     var tabs = document.querySelectorAll('.tab')
     t.x(tabs.length * (ui.tabW || 0))
     document.querySelector('#tabs').appendChild(t)
@@ -172,6 +199,15 @@ ui.switchTab = function (tab, skipLast=false) {
     tab.setClass('current', true)
     ui.last = skipLast ? ui.last : ui.current
     ui.current = tab
+    // make sure current tab is within view
+    var tabBox = document.body.querySelector('#tab-box')
+    ui.tabBoxW = parseInt(window.getComputedStyle(tabBox).width)
+    if (ui.current.x() < tabBox.scrollLeft) {
+        tabBox.scrollLeft = ui.current.x()
+    }
+    else if ((ui.current.x() + ui.tabW) > ui.tabBoxW) {
+        tabBox.scrollLeft += ui.current.x() + ui.tabW - ui.tabBoxW
+    }
 }
 
 ui.closeTabs = function (tab=null) {
@@ -179,7 +215,7 @@ ui.closeTabs = function (tab=null) {
     if (!toX) return
     var newCur = toX[toX.length-1].nextSibling || toX[0].previousSibling
     for (var i=0, item; item=toX[i]; i++) {
-        data.remove(item.data)
+        data.remove(item.sheet.data)
         item.sheet.parentNode.removeChild(item.sheet)
         item.parentNode.removeChild(item)
     }
@@ -267,7 +303,7 @@ ui.arrangeTabs = function (e) {
         for (var i=0; i<tabsTo.length; i++) {
             df.appendChild(tabsTo[i])
             tabsTo[i].x(i*ui.tabW)
-            sheetsTo.push(tabsTo[i].data)
+            sheetsTo.push(tabsTo[i].sheet.data)
         }
         document.querySelector('#tabs').appendChild(df)
         data.reorder(sheetsTo)
@@ -376,16 +412,16 @@ ui.main.addEventListener('drop', function (e) {
         return
     }
     for (var i=0, item; item=e.dataTransfer.files[i]; i++) {
-        ui.newTab(data.add(item))
+        ui.newTab(item)
     }
 })
-/*
+
 // load up existing session if one exists
 if (data.sheets.length) {
     for (var i=0; i<data.sheets.length; i++) {
         ui.newTab(data.sheets[i])
     }
-}*/
+}
 window.addEventListener('keydown', function (e) {
     // check reserved
     if (!/[\[\]\\w]/i.test(e.key)) return
