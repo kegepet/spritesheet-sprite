@@ -1,7 +1,7 @@
 data = {}
 data.sheets = []
-data.Sheet = function () { // each element in data.sheets has its prototype set to this
-    this.file = {} // file object to be re-retrieved upon load by a FileReader
+data.Sheet = function (file) { // each element in data.sheets has its prototype set to this
+    this.file = file // file object to be re-retrieved upon load by a FileReader
     /*
     The next three are relational.
     e.g.
@@ -25,13 +25,9 @@ data.Sheet.prototype.update = function (k, v) {
     this[k] = v
     data.mtime = Date.now()
 }
-data.stringify = function () {
-    // will return the stringified JSON string
-}
 data.add = function (file) {
     // create new entry in data.sheets, returns ref to new entry
-    var i = data.sheets.push(new data.Sheet())
-    data.sheets[i-1].file = file
+    var i = data.sheets.push(new data.Sheet(file))
     data.mtime = Date.now()
     return data.sheets[i-1]
 }
@@ -53,7 +49,7 @@ data.save = function () {
     data.timeout = setTimeout(data.save, 5000)
     if (data.mtime <= data.stime) return
     localStorage.setItem('spritesheet-sprite', JSON.stringify(data.sheets))
-    data.stime = Date.now()    
+    data.stime = Date.now()
 }
 data.init = function () {
     // create localStorage object if one does not exist
@@ -118,15 +114,13 @@ ui.openModal = function (message, choices, callback) {
 
 // TAB STUFF
 
-ui.newTab = function (file) {
-    // if no file is passed, it will open the default filedrop tab
-    var d = data.add(file)
-    var s = ui.sheet.create(d)
+ui.newTab = function (sheet) {
+    var s = ui.sheet.create(sheet)
     document.querySelector('#sheets').appendChild(s)
     // create new tab
     var t = document.createElement('div')
     t.className = 'tab'
-    t.data = d
+    t.data = sheet
     // tab and sheet should hold reference to one another
     t.sheet = s
     s.tab = t
@@ -148,12 +142,13 @@ ui.newTab = function (file) {
         else this.int_x = 'int_x' in this ? this.int_x : parseInt(window.getComputedStyle(this).left)
         return this.int_x
     }
-    t.innerText = d.file.name
-    t.setAttribute('title', d.file.name)
+    t.innerText = sheet.file.name
+    t.setAttribute('title', sheet.file.name)
     var tabs = document.querySelectorAll('.tab')
-    var ts = tabs.length && window.getComputedStyle(tabs[0])
-    t.x(tabs.length * (parseInt(ts.width) + parseInt(ts.marginRight)))
+    t.x(tabs.length * (ui.tabW || 0))
     document.querySelector('#tabs').appendChild(t)
+    if (!ui.tabW) var ts = window.getComputedStyle(t)
+    ui.tabW = ui.tabW || parseInt(ts.width)+parseInt(ts.marginRight)
     /*
     #tabs-spacer prevents a problem which occurs when you
     drag a range to the end of the tabs area, and the last
@@ -162,8 +157,7 @@ ui.newTab = function (file) {
     #tabs-spacer maintains the scrollable areas size when
     dragging tabs around.
     */
-    document.querySelector('#tabs-spacer').style.width = t.x() + parseInt(ts.width) + parseInt(ts.marginRight) + 'px'
-    console.log(document.querySelector('#tabs-spacer').style.width)
+    document.querySelector('#tabs-spacer').style.width = t.x() + ui.tabW + 'px'
     ui.selectTabs(t)
 }
 
@@ -182,6 +176,7 @@ ui.switchTab = function (tab, skipLast=false) {
 
 ui.closeTabs = function (tab=null) {
     var toX = tab ? [tab] : document.body.querySelectorAll('.tab.selected')
+    if (!toX) return
     var newCur = toX[toX.length-1].nextSibling || toX[0].previousSibling
     for (var i=0, item; item=toX[i]; i++) {
         data.remove(item.data)
@@ -190,12 +185,11 @@ ui.closeTabs = function (tab=null) {
     }
     // move to new positions
     var tabs = document.body.querySelectorAll('.tab')
-    var ts = tabs.length && window.getComputedStyle(tabs[0])
     for (var i=0, item; item=tabs[i]; i++) {
-        item.x(i * (parseInt(ts.width) + parseInt(ts.marginRight)))
+        item.x(i * ui.tabW)
     }
     // resize #tabs-spacer
-    document.querySelector('#tabs-spacer').style.width = tabs.length*(parseInt(ts.width)+parseInt(ts.marginRight)) + 'px'
+    document.querySelector('#tabs-spacer').style.width = tabs.length * ui.tabW + 'px'
     ui.current = ui.current.parentNode ? ui.current : null
     // and in case there is no previousSibling either...
     newCur = newCur || document.body.querySelector('.tab')
@@ -212,8 +206,6 @@ ui.arrangeTabs = function (e) {
     var tabs = document.body.querySelectorAll('.tab')
     var sels = document.body.querySelectorAll('.tab.selected')
     var toX = false
-    var tabStyle = window.getComputedStyle(tabs[0])
-    var tabW = parseInt(tabStyle.width)+parseInt(tabStyle.marginRight)
     // the bunch-up
     var tabsTo = []
     for (var i=0, q=[], x=-1; i<tabs.length; i++) {
@@ -224,8 +216,9 @@ ui.arrangeTabs = function (e) {
             tabsTo.splice(x++, 0, q.shift())
         }
     }
-    var minX = (e.pageX+e.target.parentNode.scrollLeft)-(tabW*tabsTo.indexOf(sels[0]))
-    var maxX = (e.pageX+e.target.parentNode.scrollLeft)+((tabW*tabsTo.length)-(tabW*(tabsTo.indexOf(sels[sels.length-1])+1)))
+    var scrolled = document.body.querySelector('#tab-box').scrollLeft
+    var minX = (e.pageX+scrolled)-(ui.tabW*tabsTo.indexOf(sels[0]))
+    var maxX = (e.pageX+scrolled)+(ui.tabW*(tabsTo.length-1-tabsTo.indexOf(sels[sels.length-1])))
     // mousemove handler
     var mm = function (e) {
         if (anim) return
@@ -237,7 +230,7 @@ ui.arrangeTabs = function (e) {
             if (!toX) {
                 for (var i=0; i<tabsTo.length; i++) {
                     if (bunched && /selected/.test(tabsTo[i].className)) continue
-                    tabsTo[i].x(i*tabW)
+                    tabsTo[i].x(i*ui.tabW)
                 }
                 bunched = true, toX = true
             }
@@ -245,16 +238,16 @@ ui.arrangeTabs = function (e) {
                 var iott = tabsTo.indexOf(this) // index of target
                 var ioct = tabsTo.indexOf(t) // index of current tab
                 if (/selected/.test(t.className)) {
-                    //t.x((e.pageX - offsetX) + ((ioct - iott) * tabW))
-                    t.x((Math.max(minX,Math.min(maxX,(e.pageX+this.parentNode.scrollLeft)))-offsetX)+((ioct-iott)*tabW))
+                    //t.x((e.pageX - offsetX) + ((ioct - iott) * ui.tabW))
+                    t.x((Math.max(minX,Math.min(maxX,(e.pageX+scrolled)))-offsetX)+((ioct-iott)*ui.tabW))
                 }
                 else if (ioct < tabsTo.indexOf(sels[0]) &&
-                sels[0].x() < t.x() + (tabW * 0.4)) {
+                sels[0].x() < t.x() + (ui.tabW * 0.4)) {
                     tabsTo.splice(ioct+sels.length,0,tabsTo.splice(ioct,1)[0])
                     toX = false
                 }
                 else if (ioct > tabsTo.indexOf(sels[sels.length-1]) &&
-                (sels[sels.length-1].x() + tabW) > t.x() + (tabW * 0.6)) {
+                (sels[sels.length-1].x() + ui.tabW) > t.x() + (ui.tabW * 0.6)) {
                     tabsTo.splice(ioct-sels.length,0,tabsTo.splice(ioct,1)[0])
                     toX = false
                 }
@@ -273,7 +266,7 @@ ui.arrangeTabs = function (e) {
         var sheetsTo = []
         for (var i=0; i<tabsTo.length; i++) {
             df.appendChild(tabsTo[i])
-            tabsTo[i].x(i*tabW)
+            tabsTo[i].x(i*ui.tabW)
             sheetsTo.push(tabsTo[i].data)
         }
         document.querySelector('#tabs').appendChild(df)
@@ -326,12 +319,44 @@ ui.selectTabs = function (x) {
 
 
 
-//ui.tabBox = document.querySelector('#tabs')
+ui.tabBox = document.querySelector('#tabs')
 
 ui.scrollTabs = function (e) {
-    this.scrollLeft += (50*(e.deltaY/Math.abs(e.deltaY)))    
+    var delta = e.deltaX || e.deltaY
+    this.scrollLeft += (50*(delta/Math.abs(delta)))
+    e.preventDefault()
 }
-document.querySelector('#tabs').addEventListener('wheel', ui.scrollTabs)
+document.querySelector('#tab-box').addEventListener('wheel', ui.scrollTabs)
+
+ui.tabScrollbar = document.body.querySelector('#tab-scrollbar')
+/*
+ui.tabScrollbar.toggle = function (e) {
+    this.className = this.className.replace(/ *on/,'') +
+        (e.type=='mouseover' ? (this.className ? ' on' : 'on') : '')
+}
+ui.tabScrollbar.addEventListener('mouseover', ui.tabScrollbar.toggle)
+ui.tabScrollbar.addEventListener('mouseout', ui.tabScrollbar.toggle)
+*/
+/*
+ui.tabBox.addEventListener('mousemove', function (e) {
+    // detect if mouse is over scrollbar,
+    // i.e. anywhere above the tab region
+    // not necessarily over the scrollbar itself which is too narrow
+    var tab = document.querySelector('.tab')
+    if (!tab) return
+    ui.tabStyle = ui.tabStyle || window.getComputedStyle(tab)
+    var scrollbarBottom = parseInt(ui.tabStyle.top)
+    if (e.clientY < scrollbarBottom) {
+        ui.tabScrollbar.className = ui.tabScrollbar.className.replace(/ *on/,'') +
+            (ui.tabScrollbar.className ? ' on' : 'on')
+    }
+    else ui.tabScrollbar.className = ui.tabScrollbar.className.replace(/ *on/,'')
+
+})
+*/
+ui.tabBox.addEventListener('mousedown', function (e) {
+
+})
 
 
 ui.main = document.querySelector('#main')
@@ -351,9 +376,16 @@ ui.main.addEventListener('drop', function (e) {
         return
     }
     for (var i=0, item; item=e.dataTransfer.files[i]; i++) {
-        ui.newTab(item)
+        ui.newTab(data.add(item))
     }
 })
+/*
+// load up existing session if one exists
+if (data.sheets.length) {
+    for (var i=0; i<data.sheets.length; i++) {
+        ui.newTab(data.sheets[i])
+    }
+}*/
 window.addEventListener('keydown', function (e) {
     // check reserved
     if (!/[\[\]\\w]/i.test(e.key)) return
@@ -363,5 +395,6 @@ window.addEventListener('keydown', function (e) {
     if (e.altKey && e.key == '[') ui.selectTabs(ui.current.previousSibling || ui.current.parentNode.lastChild)
     else if (e.altKey && e.key == ']') ui.selectTabs(ui.current.nextSibling || ui.current.parentNode.firstChild)
     else if (e.altKey && e.key == '\\') ui.selectTabs(ui.last || ui.current)
+    //else if (e.altKey && /[0-9]/.test(e.key)) ui.selectTabs(getTabRef(+e.key))
     else if (e.altKey && /w/i.test(e.key)) ui.closeTabs()
 })

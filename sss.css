@@ -1,6 +1,6 @@
 
 body {
-    background-color: rgb(27, 27, 27);
+    background-color: rgb(27,27,27);
     font-family: sans-serif;
     font-size: 14px;
 }
@@ -64,9 +64,10 @@ body * {
     right: 0;
     width: 40px;
     height: 50px;
+    border-left: solid 1px #515151;
     z-index: 99;
 }
-#tabs {
+#tab-box {
     position: absolute;
     top: 0;
     left: 0;
@@ -76,8 +77,15 @@ body * {
     overflow: -moz-scrollbars-none;
     white-space: none;
 }
-#tabs::-webkit-scrollbar {
+#tab-box::-webkit-scrollbar {
     display: none;
+}
+#tabs {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50px;
 }
 #tab-scrollbar {
     position: fixed;
@@ -85,7 +93,31 @@ body * {
     left: 5px;
     right: 45px;
     height: 8px;
-    background-color: rgb(49, 49, 49);
+    background:
+        linear-gradient(135deg,transparent 3px, #515151 0) top left,
+        linear-gradient(45deg,transparent 3px, #515151 0) bottom left,
+        linear-gradient(225deg,transparent 3px, #515151 0) top right,
+        linear-gradient(315deg,transparent 3px, #515151 0) bottom right;
+    background-size: 50% 50%;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+#tab-scrollbar.on {
+    opacity: 1;
+}
+#tab-scrollbar .knob {
+    position: absolute;
+    top: -1px;
+    width: 30px;
+    height: 10px;
+    background:
+        linear-gradient(135deg,transparent 3px, rgb(27,27,27) 3px, rgb(27,27,27) 5px, #515151 0) top left,
+        linear-gradient(45deg,transparent 3px, rgb(27,27,27) 3px, rgb(27,27,27) 5px, #515151 0) bottom left,
+        linear-gradient(225deg,transparent 3px, rgb(27,27,27) 3px, rgb(27,27,27) 5px, #515151 0) top right,
+        linear-gradient(315deg,transparent 3px, rgb(27,27,27) 3px, rgb(27,27,27) 5px, #515151 0) bottom right;
+    background-size: 50% 50%;
+    background-repeat: no-repeat;
 }
 /*
 #tabs-spacer prevents that weird problem which
@@ -119,19 +151,23 @@ the scrollable areas size when dragging tabs around.
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
-    border-radius: 7px 7px 0 0;
+    background: linear-gradient(135deg,transparent 4px, #686868 0);
+    /*border-radius: 7px 7px 0 0;*/
     /*transition: left 0.2s;*/
 }
 .tab.current {
     background-color: #878787;
+    background: linear-gradient(135deg,transparent 4px, #878787 0);
 }
 .tab.selected {
     background-color: #906f99;
+    background: linear-gradient(135deg,transparent 4px, #906f99 0);
     color: #fff;
     z-index: 99;
 }
 .tab.current.selected {
     background-color: #bd91c9;
+    background: linear-gradient(135deg,transparent 4px, #bd91c9 0);
 }
 #sheets {
     position: absolute;
