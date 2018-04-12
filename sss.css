@@ -2,7 +2,10 @@
 body {
     background-color: rgb(27,27,27);
     font-family: sans-serif;
+    /* font-size will determine the deltaY of the WheelEvent in firefox
+    since that browser uses a deltaMode of 1, which is line mode */
     font-size: 14px;
+    line-height: 1;
 }
 body * {
     box-sizing: border-box;
@@ -67,7 +70,7 @@ body * {
     border-left: solid 1px #515151;
     z-index: 99;
 }
-#tab-box {
+#tabs-main {
     position: absolute;
     top: 0;
     left: 0;
@@ -77,7 +80,7 @@ body * {
     overflow: -moz-scrollbars-none;
     white-space: none;
 }
-#tab-box::-webkit-scrollbar {
+#tabs-main::-webkit-scrollbar {
     display: none;
 }
 #tabs {
@@ -87,8 +90,16 @@ body * {
     right: 0;
     height: 50px;
 }
-#tab-scrollbar {
+
+#tab-scroller {
     position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 20px; /* because the tabs are 30px high */
+}
+#tab-scroller .bar {
+    position: absolute;
     top: 6px;
     left: 5px;
     right: 45px;
@@ -98,15 +109,27 @@ body * {
         linear-gradient(45deg,transparent 3px, #515151 0) bottom left,
         linear-gradient(225deg,transparent 3px, #515151 0) top right,
         linear-gradient(315deg,transparent 3px, #515151 0) bottom right;
-    background-size: 50% 50%;
+    background-size: 60% 50%; /* set width to 60% to avoid weird gap in middle */
     background-repeat: no-repeat;
-    opacity: 0;
+    /*opacity: 0;
     transition: opacity 0.1s;
+    pointer-events: none;*/
 }
-#tab-scrollbar.on {
+#tab-scroller.on .bar,
+#tab-scroller.on .knob {
+    pointer-events: auto;
+}
+#tab-scroller.on .bar {
     opacity: 1;
 }
-#tab-scrollbar .knob {
+#tab-scroller .track {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 30px; /* the width of the knob */
+}
+#tab-scroller .knob {
     position: absolute;
     top: -1px;
     width: 30px;
@@ -118,19 +141,6 @@ body * {
         linear-gradient(315deg,transparent 3px, rgb(27,27,27) 3px, rgb(27,27,27) 5px, #515151 0) bottom right;
     background-size: 50% 50%;
     background-repeat: no-repeat;
-}
-/*
-#tabs-spacer prevents that weird problem which
-occurs when you drag a range to the end of the
-tabs area, and the last tab moves out of place,
-which causes the scrollable area to shorten for a
-moment, messing everything up. #tabs-spacer maintains
-the scrollable areas size when dragging tabs around.
-*/
-#tabs-spacer {
-    position: absolute;
-    width: auto;
-    height: 1px; /* yep, you need the height here */
 }
 .tab {
     position: absolute;
@@ -206,5 +216,8 @@ the scrollable areas size when dragging tabs around.
     border-left: solid 1px #ccc;
 }
 
-
-/* overlay messages */
+.sheet img {
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
+}

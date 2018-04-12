@@ -37,7 +37,8 @@ ui.sheet.create = function (dataref) {
         sheet.panel[i] = ui.sheet.panel[i]
     }
     var img = document.createElement('img')
-    img.src = sheet.data.image.dataURL
+    img.setAttribute('draggable',false)
+    img.src = sheet.data.image.path || 'data:'+sheet.data.image.type+';base64,'+sheet.data.image.data
     sheet.stage.appendChild(img)
     return sheet
 }

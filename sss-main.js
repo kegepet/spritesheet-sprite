@@ -2,7 +2,8 @@ data = {}
 data.sheets = []
 data.Sheet = function () { // each element in data.sheets has its prototype set to this
     this.image = {
-        dataURL: '',
+        data: '', // base64-encoded image data
+        path: '', // path must be provided manually by user
         name: '',
         type: '',
         size: ''
@@ -17,6 +18,7 @@ data.Sheet = function () { // each element in data.sheets has its prototype set 
     These relationships are stored as ref properties in their respective
     container objects in the form of indices within the other lists.
     */
+    this.persistent = true, // whether localstorage should store the image data
     this.sprites = [] // all sprites and member data in current sheet
     this.states = []  // all different states among different sprites 
     this.frames = []  // all different frames among different states
@@ -36,7 +38,7 @@ data.add = function (file, callback) {
     fr.addEventListener('load', function (e) {
         //console.log(e.total/1000 + 'KB')
         s.update('image', {
-            dataURL: fr.result,
+            data: fr.result.split(',',2)[1],
             name: file.name,
             type: file.type,
             size: e.total
@@ -94,7 +96,11 @@ data.init = function () {
 
 ui = window.ui || {}
 
-// utility functions
+
+
+// UTILITY
+
+
 ui.openAlert = function (template_id, ttl=0) {
     // ttl set to 0 (secs) will not timeout (default)
     // clicking on the alert, hitting esc, or the X will close the alert
@@ -136,7 +142,10 @@ ui.openModal = function (message, choices, callback, context=document.body) {
 }
 
 
+
 // TAB STUFF
+
+
 
 ui.newTab = function (x) {
     if (x.constructor == File) {
@@ -173,18 +182,12 @@ ui.newTab = function (x) {
     t.setAttribute('title', x.image.name)
     var tabs = document.querySelectorAll('.tab')
     t.x(tabs.length * (ui.tabW || 0))
-    document.querySelector('#tabs').appendChild(t)
+    ui.tabs = ui.tabs || document.querySelector('#tabs')
+    ui.tabs.appendChild(t)
     if (!ui.tabW) var ts = window.getComputedStyle(t)
     ui.tabW = ui.tabW || parseInt(ts.width)+parseInt(ts.marginRight)
-    /*
-    #tabs-spacer prevents a problem which occurs when you
-    drag a range to the end of the tabs area, and the last
-    tab moves out of place, which causes the scrollable
-    area to shorten for a moment, messing everything up.
-    #tabs-spacer maintains the scrollable areas size when
-    dragging tabs around.
-    */
-    document.querySelector('#tabs-spacer').style.width = t.x() + ui.tabW + 'px'
+    // set #tabs width manually maintains the scrollable areas size when dragging tabs around.
+    ui.tabs.style.width = t.x() + ui.tabW + 'px'
     ui.selectTabs(t)
 }
 
@@ -200,13 +203,13 @@ ui.switchTab = function (tab, skipLast=false) {
     ui.last = skipLast ? ui.last : ui.current
     ui.current = tab
     // make sure current tab is within view
-    var tabBox = document.body.querySelector('#tab-box')
-    ui.tabBoxW = parseInt(window.getComputedStyle(tabBox).width)
-    if (ui.current.x() < tabBox.scrollLeft) {
-        tabBox.scrollLeft = ui.current.x()
+    var tabsMain = document.body.querySelector('#tabs-main')
+    ui.tabsMainW = parseInt(window.getComputedStyle(tabsMain).width)
+    if (ui.current.x() < tabsMain.scrollLeft) {
+        tabsMain.scrollLeft = ui.current.x()
     }
-    else if ((ui.current.x() + ui.tabW) > ui.tabBoxW) {
-        tabBox.scrollLeft += ui.current.x() + ui.tabW - ui.tabBoxW
+    else if ((ui.current.x() + ui.tabW - tabsMain.scrollLeft) > ui.tabsMainW) {
+        tabsMain.scrollLeft = ui.current.x() + ui.tabW - ui.tabsMainW
     }
 }
 
@@ -224,8 +227,7 @@ ui.closeTabs = function (tab=null) {
     for (var i=0, item; item=tabs[i]; i++) {
         item.x(i * ui.tabW)
     }
-    // resize #tabs-spacer
-    document.querySelector('#tabs-spacer').style.width = tabs.length * ui.tabW + 'px'
+    ui.tabs.style.width = tabs.length * ui.tabW + 'px'
     ui.current = ui.current.parentNode ? ui.current : null
     // and in case there is no previousSibling either...
     newCur = newCur || document.body.querySelector('.tab')
@@ -237,7 +239,7 @@ ui.arrangeTabs = function (e) {
     var zeroX = e.screenX // to check whether stickiness gets unstuck
     var offsetX = e.offsetX
     var anim = false
-    var tabdrag = false
+    ui.tabdrag = false // scope tabdrag to ui so the autoscrolling feature can work
     var bunched = false
     var tabs = document.body.querySelectorAll('.tab')
     var sels = document.body.querySelectorAll('.tab.selected')
@@ -252,17 +254,14 @@ ui.arrangeTabs = function (e) {
             tabsTo.splice(x++, 0, q.shift())
         }
     }
-    var scrolled = document.body.querySelector('#tab-box').scrollLeft
-    var minX = (e.pageX+scrolled)-(ui.tabW*tabsTo.indexOf(sels[0]))
-    var maxX = (e.pageX+scrolled)+(ui.tabW*(tabsTo.length-1-tabsTo.indexOf(sels[sels.length-1])))
-    // mousemove handler
     var mm = function (e) {
         if (anim) return
         anim = true
         window.requestAnimationFrame(function () {
             anim = false
-            tabdrag = tabdrag || (Math.abs(e.screenX - zeroX) > 7)
-            if (!tabdrag || tabdrag=='cancel') return
+            ui.tabdrag = ui.tabdrag || (Math.abs(e.screenX - zeroX) > 7)
+            if (!ui.tabdrag) return
+            ui.mouseX = e.pageX // for the tabdrag autoscroll feature in scrolling section
             if (!toX) {
                 for (var i=0; i<tabsTo.length; i++) {
                     if (bunched && /selected/.test(tabsTo[i].className)) continue
@@ -270,12 +269,15 @@ ui.arrangeTabs = function (e) {
                 }
                 bunched = true, toX = true
             }
-            for (var i=0, t; t=tabs[i]; i++) {
-                var iott = tabsTo.indexOf(this) // index of target
+            var scrlX = ui.tabsMain.scrollLeft // ui.tabsMain is defined in the scrolling section
+            for (var i=0, s=-1, t; t=tabs[i]; i++) {
+                var iott = tabsTo.indexOf(this) // index of target tab
                 var ioct = tabsTo.indexOf(t) // index of current tab
                 if (/selected/.test(t.className)) {
-                    //t.x((e.pageX - offsetX) + ((ioct - iott) * ui.tabW))
-                    t.x((Math.max(minX,Math.min(maxX,(e.pageX+scrolled)))-offsetX)+((ioct-iott)*ui.tabW))
+                    var offsetS = ui.tabW * (ioct - iott)
+                    var minX = ui.tabW * ++s
+                    var maxX = parseInt(ui.tabs.style.width) - (ui.tabW * (sels.length - s))
+                    t.x(Math.max(minX,Math.min(maxX,e.pageX+scrlX-offsetX+offsetS)))
                 }
                 else if (ioct < tabsTo.indexOf(sels[0]) &&
                 sels[0].x() < t.x() + (ui.tabW * 0.4)) {
@@ -294,9 +296,10 @@ ui.arrangeTabs = function (e) {
     var mu = function (e) {
         window.removeEventListener('mousemove', mm)
         window.removeEventListener('mouseup', mu, true)
-        if (!tabdrag) return
+        if (!ui.tabdrag) return
         e.stopPropagation()
-        tabdrag = 'cancel'
+        ui.tabdrag = false
+        zeroX = e.screenX // resttin zeroX will prevent any vestigial iteration of mm to reset tabdrag to true
         // apply tabsTo to DOM
         var df = document.createDocumentFragment()
         var sheetsTo = []
@@ -305,7 +308,7 @@ ui.arrangeTabs = function (e) {
             tabsTo[i].x(i*ui.tabW)
             sheetsTo.push(tabsTo[i].sheet.data)
         }
-        document.querySelector('#tabs').appendChild(df)
+        ui.tabs.appendChild(df)
         data.reorder(sheetsTo)
     }
     window.addEventListener('mousemove', mm)
@@ -354,52 +357,81 @@ ui.selectTabs = function (x) {
 
 
 
+// TAB SCROLLING
 
-ui.tabBox = document.querySelector('#tabs')
 
-ui.scrollTabs = function (e) {
-    var delta = e.deltaX || e.deltaY
-    this.scrollLeft += (50*(delta/Math.abs(delta)))
-    e.preventDefault()
-}
-document.querySelector('#tab-box').addEventListener('wheel', ui.scrollTabs)
 
-ui.tabScrollbar = document.body.querySelector('#tab-scrollbar')
-/*
-ui.tabScrollbar.toggle = function (e) {
-    this.className = this.className.replace(/ *on/,'') +
-        (e.type=='mouseover' ? (this.className ? ' on' : 'on') : '')
-}
-ui.tabScrollbar.addEventListener('mouseover', ui.tabScrollbar.toggle)
-ui.tabScrollbar.addEventListener('mouseout', ui.tabScrollbar.toggle)
-*/
-/*
-ui.tabBox.addEventListener('mousemove', function (e) {
-    // detect if mouse is over scrollbar,
-    // i.e. anywhere above the tab region
-    // not necessarily over the scrollbar itself which is too narrow
-    var tab = document.querySelector('.tab')
-    if (!tab) return
-    ui.tabStyle = ui.tabStyle || window.getComputedStyle(tab)
-    var scrollbarBottom = parseInt(ui.tabStyle.top)
-    if (e.clientY < scrollbarBottom) {
-        ui.tabScrollbar.className = ui.tabScrollbar.className.replace(/ *on/,'') +
-            (ui.tabScrollbar.className ? ' on' : 'on')
+ui.tabsMain = document.body.querySelector('#tabs-main')
+ui.tabsMain.addEventListener('wheel', function (e) {
+    //console.log('deltaMode is ' + e.deltaMode + ', deltaX is ' + e.deltaX + ', deltaY is ' + e.deltaY)
+    //var delta = e.deltaX || e.deltaY
+    var delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
+    // normalize delta for deltaModes greater than 0
+    // e.g. firefox uses line-based deltas (mode 1)
+    if (e.deltaMode) {
+        delta = 50*(delta/Math.abs(delta))
     }
-    else ui.tabScrollbar.className = ui.tabScrollbar.className.replace(/ *on/,'')
+    this.scrollLeft += delta
+    e.preventDefault()
+})
+ui.tabScroller = document.body.querySelector('#tab-scroller')
+ui.tabScroller.bar = ui.tabScroller.querySelector('.bar')
+ui.tabScroller.track = ui.tabScroller.querySelector('.track')
+ui.tabScroller.knob = ui.tabScroller.querySelector('.knob')
 
+ui.tabScroller.knob.addEventListener('mousedown', function (e) {
+    var trackW = parseInt(window.getComputedStyle(ui.tabScroller.track).width)
+    var knobW = parseInt(window.getComputedStyle(ui.tabScroller.knob).width)
+    var barX = parseInt(window.getComputedStyle(ui.tabScroller.bar).left)
+    var knob = ui.tabScroller.knob
+    var offsetX = e.offsetX
+    var maxScroll = parseInt(ui.tabs.style.width)-parseInt(window.getComputedStyle(ui.tabsMain).width)
+    //knob.active = true
+    function mm(e) {
+        if (knob.anim) return
+        knob.anim = true
+        window.requestAnimationFrame(function () {
+            //console.log(trackW)
+            var x = Math.max(0,Math.min(trackW, e.clientX - barX - offsetX))
+            knob.style.left = 100 * (x / trackW) + '%'
+            ui.tabsMain.scrollLeft = maxScroll * (x / trackW)
+            knob.anim = false
+        })
+    }
+    window.addEventListener('mousemove', mm)
+    window.addEventListener('mouseup', function (e) {
+        //if (!knob.active) return
+        //knob.active = false
+        window.removeEventListener('mousemove', mm)
+        window.removeEventListener('mouseup', arguments.callee)
+    })
+})
+
+ui.tabsMain.addEventListener('scroll', function (e) {
+    //console.log(e.type)
+})
+/*
+window.requestAnimationFrame(function () {
+    var tabsMainW = parseInt(window.getComputedStyle(ui.tabsMain).width)
+    if (ui.tabdrag && (ui.mouseX < 30 || ui.mouseX > (tabsMainW - 30))) {
+        ui.tabsMain.scrollLeft += ui.mouseX - (ui.mouseX < 30 ? 30 : (tabsMainW-30))
+    }
+    window.requestAnimationFrame(arguments.callee)
 })
 */
-ui.tabBox.addEventListener('mousedown', function (e) {
 
-})
+
+// DRAG AND DROP FILES
 
 
 ui.main = document.querySelector('#main')
 ui.main.addEventListener('dragenter', function (e) {
+    if (e.dataTransfer.types.indexOf('Files')<0) return
     ui.openAlert('filedrop')
 })
 ui.main.addEventListener('dragleave', function (e) {
+    e.preventDefault()
+    if (e.dataTransfer.types.indexOf('Files')<0) return
     document.querySelector('body > .overlay').remove()
 })
 ui.main.addEventListener('dragover', function (e) {// yes, this is necessary
@@ -407,6 +439,7 @@ ui.main.addEventListener('dragover', function (e) {// yes, this is necessary
 })
 ui.main.addEventListener('drop', function (e) {
     e.preventDefault()
+    if (e.dataTransfer.types.indexOf('Files')<0) return
     document.querySelector('body > .overlay').remove()
     if (!e.dataTransfer.files) {
         return
