@@ -236,10 +236,13 @@ ui.closeTabs = function (tab=null) {
 
 
 ui.arrangeTabs = function (e) {
+    var target = e.target
     var zeroX = e.screenX // to check whether stickiness gets unstuck
     var offsetX = e.offsetX
+    var mouseX = e.clientX
     var anim = false
-    ui.tabdrag = false // scope tabdrag to ui so the autoscrolling feature can work
+    var tabdrag = false // scope tabdrag to ui so the autoscrolling feature can work
+    var autoscroll = false
     var bunched = false
     var tabs = document.body.querySelectorAll('.tab')
     var sels = document.body.querySelectorAll('.tab.selected')
@@ -254,52 +257,64 @@ ui.arrangeTabs = function (e) {
             tabsTo.splice(x++, 0, q.shift())
         }
     }
+    var dragTabs = function () {
+        if (!toX) {
+            for (var i=0; i<tabsTo.length; i++) {
+                if (bunched && /selected/.test(tabsTo[i].className)) continue
+                tabsTo[i].x(i*ui.tabW)
+            }
+            bunched = true, toX = true
+        }
+        var scrlX = ui.tabsMain.scrollLeft // ui.tabsMain is defined in the scrolling section
+        for (var i=0, s=-1, t; t=tabs[i]; i++) {
+            var iott = tabsTo.indexOf(target) // index of target tab
+            var ioct = tabsTo.indexOf(t) // index of current tab
+            if (/selected/.test(t.className)) {
+                var offsetS = ui.tabW * (ioct - iott)
+                var minX = ui.tabW * ++s
+                var maxX = parseInt(ui.tabs.style.width) - (ui.tabW * (sels.length - s))
+                t.x(Math.max(minX,Math.min(maxX,mouseX+scrlX-offsetX+offsetS)))
+            }
+            else if (ioct < tabsTo.indexOf(sels[0]) &&
+            sels[0].x() < t.x() + (ui.tabW * 0.4)) {
+                tabsTo.splice(ioct+sels.length,0,tabsTo.splice(ioct,1)[0])
+                toX = false
+            }
+            else if (ioct > tabsTo.indexOf(sels[sels.length-1]) &&
+            (sels[sels.length-1].x() + ui.tabW) > t.x() + (ui.tabW * 0.6)) {
+                tabsTo.splice(ioct-sels.length,0,tabsTo.splice(ioct,1)[0])
+                toX = false
+            }
+        }
+    }
+    var scrollTabs = function () {
+        autoscroll = true
+        var tabsMainW = parseInt(window.getComputedStyle(ui.tabsMain).width)
+        if (tabdrag && ((mouseX < 30) || (mouseX > (tabsMainW - 30)))) {
+            ui.tabsMain.scrollLeft += mouseX - ((mouseX < 30) ? 30 : (tabsMainW-30))
+            dragTabs()
+        }
+        tabdrag && window.requestAnimationFrame(scrollTabs)
+    }
     var mm = function (e) {
         if (anim) return
         anim = true
         window.requestAnimationFrame(function () {
             anim = false
-            ui.tabdrag = ui.tabdrag || (Math.abs(e.screenX - zeroX) > 7)
-            if (!ui.tabdrag) return
-            ui.mouseX = e.pageX // for the tabdrag autoscroll feature in scrolling section
-            if (!toX) {
-                for (var i=0; i<tabsTo.length; i++) {
-                    if (bunched && /selected/.test(tabsTo[i].className)) continue
-                    tabsTo[i].x(i*ui.tabW)
-                }
-                bunched = true, toX = true
-            }
-            var scrlX = ui.tabsMain.scrollLeft // ui.tabsMain is defined in the scrolling section
-            for (var i=0, s=-1, t; t=tabs[i]; i++) {
-                var iott = tabsTo.indexOf(this) // index of target tab
-                var ioct = tabsTo.indexOf(t) // index of current tab
-                if (/selected/.test(t.className)) {
-                    var offsetS = ui.tabW * (ioct - iott)
-                    var minX = ui.tabW * ++s
-                    var maxX = parseInt(ui.tabs.style.width) - (ui.tabW * (sels.length - s))
-                    t.x(Math.max(minX,Math.min(maxX,e.pageX+scrlX-offsetX+offsetS)))
-                }
-                else if (ioct < tabsTo.indexOf(sels[0]) &&
-                sels[0].x() < t.x() + (ui.tabW * 0.4)) {
-                    tabsTo.splice(ioct+sels.length,0,tabsTo.splice(ioct,1)[0])
-                    toX = false
-                }
-                else if (ioct > tabsTo.indexOf(sels[sels.length-1]) &&
-                (sels[sels.length-1].x() + ui.tabW) > t.x() + (ui.tabW * 0.6)) {
-                    tabsTo.splice(ioct-sels.length,0,tabsTo.splice(ioct,1)[0])
-                    toX = false
-                }
-            }
-        }.bind(this))
+            tabdrag = tabdrag || (Math.abs(e.screenX - zeroX) > 7)
+            if (!tabdrag) return
+            mouseX = e.clientX // for the tabdrag autoscroll feature in scrolling section
+            !autoscroll && scrollTabs()
+            dragTabs()
+        })
     }.bind(e.target)
-    // mouseup handler
     var mu = function (e) {
         window.removeEventListener('mousemove', mm)
         window.removeEventListener('mouseup', mu, true)
-        if (!ui.tabdrag) return
+        if (!tabdrag) return
         e.stopPropagation()
-        ui.tabdrag = false
-        zeroX = e.screenX // resttin zeroX will prevent any vestigial iteration of mm to reset tabdrag to true
+        tabdrag = false
+        zeroX = e.screenX // reset zeroX to prevent vestigial iteration of mm to reset tabdrag to true
         // apply tabsTo to DOM
         var df = document.createDocumentFragment()
         var sheetsTo = []
@@ -357,11 +372,21 @@ ui.selectTabs = function (x) {
 
 
 
+
 // TAB SCROLLING
 
 
 
-ui.tabsMain = document.body.querySelector('#tabs-main')
+// some global references
+ui.main = ui.main || document.querySelector('#main')
+ui.tabsMain = ui.tabsMain || document.body.querySelector('#tabs-main')
+ui.tabScroller = document.body.querySelector('#tab-scroller')
+ui.tabScroller.bar = ui.tabScroller.querySelector('.bar')
+ui.tabScroller.knob = ui.tabScroller.querySelector('.knob')
+ui.tabsMainW = parseInt(window.getComputedStyle(ui.tabsMain).width)
+ui.tabScroller.barW = parseInt(window.getComputedStyle(ui.tabScroller.bar).width)
+ui.tabScroller.barX = parseInt(window.getComputedStyle(ui.tabScroller.bar).left)
+
 ui.tabsMain.addEventListener('wheel', function (e) {
     //console.log('deltaMode is ' + e.deltaMode + ', deltaX is ' + e.deltaX + ', deltaY is ' + e.deltaY)
     //var delta = e.deltaX || e.deltaY
@@ -374,27 +399,33 @@ ui.tabsMain.addEventListener('wheel', function (e) {
     this.scrollLeft += delta
     e.preventDefault()
 })
-ui.tabScroller = document.body.querySelector('#tab-scroller')
-ui.tabScroller.bar = ui.tabScroller.querySelector('.bar')
-ui.tabScroller.track = ui.tabScroller.querySelector('.track')
-ui.tabScroller.knob = ui.tabScroller.querySelector('.knob')
+
+ui.tabScroller.addEventListener('mouseover', function (e) {
+    ui.tabScroller.timeout = clearTimeout(ui.tabScroller.timeout)
+    this.className = this.className.replace(/ *on/,'') + (this.className ? ' on' : 'on')
+})
+ui.tabScroller.addEventListener('mouseout', function () {
+    ui.tabScroller.timeout = setTimeout(function () {
+        ui.tabScroller.className = ui.tabScroller.className.replace(/ *on/,'')
+    },2000)
+})
 
 ui.tabScroller.knob.addEventListener('mousedown', function (e) {
-    var trackW = parseInt(window.getComputedStyle(ui.tabScroller.track).width)
-    var knobW = parseInt(window.getComputedStyle(ui.tabScroller.knob).width)
-    var barX = parseInt(window.getComputedStyle(ui.tabScroller.bar).left)
+    var barW = ui.tabScroller.barW
+    var barX = ui.tabScroller.barX
     var knob = ui.tabScroller.knob
+    var knobW = parseInt(window.getComputedStyle(ui.tabScroller.knob).width)
+    var tabsW = parseInt(ui.tabs.style.width)
     var offsetX = e.offsetX
-    var maxScroll = parseInt(ui.tabs.style.width)-parseInt(window.getComputedStyle(ui.tabsMain).width)
+    var maxScroll = tabsW - ui.tabsMainW
     //knob.active = true
     function mm(e) {
         if (knob.anim) return
         knob.anim = true
         window.requestAnimationFrame(function () {
-            //console.log(trackW)
-            var x = Math.max(0,Math.min(trackW, e.clientX - barX - offsetX))
-            knob.style.left = 100 * (x / trackW) + '%'
-            ui.tabsMain.scrollLeft = maxScroll * (x / trackW)
+            var x = Math.max(0,Math.min(barW-knobW, e.clientX - barX - offsetX))
+            knob.style.left = x + 'px'
+            ui.tabsMain.scrollLeft = maxScroll * (x / (barW - knobW))
             knob.anim = false
         })
     }
@@ -407,24 +438,37 @@ ui.tabScroller.knob.addEventListener('mousedown', function (e) {
     })
 })
 
-ui.tabsMain.addEventListener('scroll', function (e) {
-    //console.log(e.type)
+ui.resettingScrollbar = false
+ui.resetScrollbar = function (e) {
+    if (ui.resettingScrollbar) return
+    ui.resettingScrollbar = true
+    window.requestAnimationFrame(function () {
+        var barW = ui.tabScroller.barW
+        var knob = ui.tabScroller.knob
+        var tabsW = parseInt(ui.tabs.style.width)
+        // adjust knob size
+        knobW = barW * (ui.tabsMainW / tabsW)
+        var ratioScrolled = ui.tabsMain.scrollLeft / (tabsW - ui.tabsMainW)
+        knob.style.width = knobW + 'px'
+        knob.style.left = (barW - knobW) * ratioScrolled + 'px'
+        ui.resettingScrollbar = false
+    })
+}
+
+ui.tabsMain.addEventListener('scroll', ui.resetScrollbar)
+window.addEventListener('resize', function (e) {
+    ui.tabsMainW = parseInt(window.getComputedStyle(ui.tabsMain).width)
+    ui.tabScroller.barW = parseInt(window.getComputedStyle(ui.tabScroller.bar).width)
+    ui.resetScrollbar()
 })
-/*
-window.requestAnimationFrame(function () {
-    var tabsMainW = parseInt(window.getComputedStyle(ui.tabsMain).width)
-    if (ui.tabdrag && (ui.mouseX < 30 || ui.mouseX > (tabsMainW - 30))) {
-        ui.tabsMain.scrollLeft += ui.mouseX - (ui.mouseX < 30 ? 30 : (tabsMainW-30))
-    }
-    window.requestAnimationFrame(arguments.callee)
-})
-*/
+
+
 
 
 // DRAG AND DROP FILES
 
 
-ui.main = document.querySelector('#main')
+
 ui.main.addEventListener('dragenter', function (e) {
     if (e.dataTransfer.types.indexOf('Files')<0) return
     ui.openAlert('filedrop')
@@ -449,12 +493,13 @@ ui.main.addEventListener('drop', function (e) {
     }
 })
 
-// load up existing session if one exists
-if (data.sheets.length) {
-    for (var i=0; i<data.sheets.length; i++) {
-        ui.newTab(data.sheets[i])
-    }
-}
+
+
+
+// KEY BINDINGS
+
+
+
 window.addEventListener('keydown', function (e) {
     // check reserved
     if (!/[\[\]\\w]/i.test(e.key)) return
@@ -467,3 +512,13 @@ window.addEventListener('keydown', function (e) {
     //else if (e.altKey && /[0-9]/.test(e.key)) ui.selectTabs(getTabRef(+e.key))
     else if (e.altKey && /w/i.test(e.key)) ui.closeTabs()
 })
+
+
+
+
+// load up existing session if one exists
+if (data.sheets.length) {
+    for (var i=0; i<data.sheets.length; i++) {
+        ui.newTab(data.sheets[i])
+    }
+}

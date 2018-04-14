@@ -61,12 +61,13 @@ body * {
 #main {
     overflow: hidden; /* so the tabscrollbox doesn't create scrollbars */
 }
-#menu {
-    position: absolute;
+#menu-button {
+    position: fixed;
     top: 0;
     right: 0;
     width: 40px;
     height: 50px;
+    background-color: rgb(27,27,27);
     border-left: solid 1px #515151;
     z-index: 99;
 }
@@ -105,15 +106,14 @@ body * {
     right: 45px;
     height: 8px;
     background:
-        linear-gradient(135deg,transparent 3px, #515151 0) top left,
-        linear-gradient(45deg,transparent 3px, #515151 0) bottom left,
-        linear-gradient(225deg,transparent 3px, #515151 0) top right,
-        linear-gradient(315deg,transparent 3px, #515151 0) bottom right;
+        linear-gradient(135deg,transparent 3px, #3d3d3d 0) top left,
+        linear-gradient(45deg,transparent 3px, #3d3d3d 0) bottom left,
+        linear-gradient(225deg,transparent 3px, #3d3d3d 0) top right,
+        linear-gradient(315deg,transparent 3px, #3d3d3d 0) bottom right;
     background-size: 60% 50%; /* set width to 60% to avoid weird gap in middle */
     background-repeat: no-repeat;
-    /*opacity: 0;
-    transition: opacity 0.1s;
-    pointer-events: none;*/
+    opacity: 0;
+    transition: opacity 0.2s;
 }
 #tab-scroller.on .bar,
 #tab-scroller.on .knob {
@@ -139,7 +139,7 @@ body * {
         linear-gradient(45deg,transparent 3px, rgb(27,27,27) 3px, rgb(27,27,27) 5px, #515151 0) bottom left,
         linear-gradient(225deg,transparent 3px, rgb(27,27,27) 3px, rgb(27,27,27) 5px, #515151 0) top right,
         linear-gradient(315deg,transparent 3px, rgb(27,27,27) 3px, rgb(27,27,27) 5px, #515151 0) bottom right;
-    background-size: 50% 50%;
+    background-size: 60% 50%;
     background-repeat: no-repeat;
 }
 .tab {
@@ -166,8 +166,7 @@ body * {
     /*transition: left 0.2s;*/
 }
 .tab.current {
-    background-color: #878787;
-    background: linear-gradient(225deg,transparent 4px, #878787 0);
+
 }
 .tab.selected {
     background-color: #906f99;
