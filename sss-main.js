@@ -297,6 +297,7 @@ ui.arrangeTabs = function (e) {
         tabdrag && window.requestAnimationFrame(scrollTabs)
     }
     var mm = function (e) {
+        e.preventDefault()
         if (anim) return
         anim = true
         window.requestAnimationFrame(function () {
@@ -340,12 +341,12 @@ ui.selectTabs = function (x) {
     var selected = /selected/.test(target.className)
     var current = /current/.test(target.className)
     var tabs = document.body.querySelectorAll('.tab')
-    // if only one tab is selected and the target is that one, nothign to do--return
+    // if only one tab is selected and the target is that one, nothing to do, return
     if (document.body.querySelectorAll('.selected').length==1 && current) return
     // if you mouse down on a selected tab without holding shift or control, return
     // only arrangeTabs does anything in that case
     if (me && x.type=='mousedown' && !ck && !sk && selected) return
-    if (me && x.type=='mouseup' && !selected) return
+    if (me && x.type=='mouseup' && !(selected && !ck && !sk)) return
     if (!me || !ck) {
         for (var i=0, item; item=tabs[i]; i++) {
             item.setClass('selected', false)
@@ -360,7 +361,7 @@ ui.selectTabs = function (x) {
     }
     else ui.anchor = target
     if (!sk && ck) {
-        target.setClass('selected', !selected)
+        target.setClass('selected', selected=!selected)
         if (current) {
             target = document.body.querySelector('.selected') // left-most selected tab
         }
@@ -377,9 +378,8 @@ ui.selectTabs = function (x) {
 
 
 
-// some global references
-ui.main = ui.main || document.querySelector('#main')
 ui.tabsMain = ui.tabsMain || document.body.querySelector('#tabs-main')
+ui.tabs = ui.tabs || document.querySelector('#tabs')
 ui.tabScroller = document.body.querySelector('#tab-scroller')
 ui.tabScroller.bar = ui.tabScroller.querySelector('.bar')
 ui.tabScroller.knob = ui.tabScroller.querySelector('.knob')
@@ -401,12 +401,17 @@ ui.tabsMain.addEventListener('wheel', function (e) {
 })
 
 ui.tabScroller.addEventListener('mouseover', function (e) {
+    if (!ui.tabs.hasChildNodes() || parseInt(ui.tabs.style.width) <= ui.tabsMainW) return
     ui.tabScroller.timeout = clearTimeout(ui.tabScroller.timeout)
-    this.className = this.className.replace(/ *on/,'') + (this.className ? ' on' : 'on')
+    this.className = this.className.replace(/ *on/g,'') + (this.className ? ' on' : 'on')
 })
-ui.tabScroller.addEventListener('mouseout', function () {
+ui.tabScroller.addEventListener('mouseout', function (e) {
+    if (ui.tabScroller.knob.active) {
+        setTimeout(arguments.callee,500)
+        return
+    }
     ui.tabScroller.timeout = setTimeout(function () {
-        ui.tabScroller.className = ui.tabScroller.className.replace(/ *on/,'')
+    ui.tabScroller.className = ui.tabScroller.className.replace(/ *on/g,'')
     },2000)
 })
 
@@ -418,8 +423,9 @@ ui.tabScroller.knob.addEventListener('mousedown', function (e) {
     var tabsW = parseInt(ui.tabs.style.width)
     var offsetX = e.offsetX
     var maxScroll = tabsW - ui.tabsMainW
-    //knob.active = true
-    function mm(e) {
+    knob.active = true
+    var mm = function (e) {
+        e.preventDefault()
         if (knob.anim) return
         knob.anim = true
         window.requestAnimationFrame(function () {
@@ -431,8 +437,8 @@ ui.tabScroller.knob.addEventListener('mousedown', function (e) {
     }
     window.addEventListener('mousemove', mm)
     window.addEventListener('mouseup', function (e) {
-        //if (!knob.active) return
-        //knob.active = false
+        if (!knob.active) return
+        knob.active = false
         window.removeEventListener('mousemove', mm)
         window.removeEventListener('mouseup', arguments.callee)
     })
@@ -445,9 +451,10 @@ ui.resetScrollbar = function (e) {
     window.requestAnimationFrame(function () {
         var barW = ui.tabScroller.barW
         var knob = ui.tabScroller.knob
+        knob.initW = knob.initW || parseInt(window.getComputedStyle(knob).width)
         var tabsW = parseInt(ui.tabs.style.width)
         // adjust knob size
-        knobW = barW * (ui.tabsMainW / tabsW)
+        knobW = Math.max(knob.initW,Math.min(barW,barW*(ui.tabsMainW/tabsW)))
         var ratioScrolled = ui.tabsMain.scrollLeft / (tabsW - ui.tabsMainW)
         knob.style.width = knobW + 'px'
         knob.style.left = (barW - knobW) * ratioScrolled + 'px'
@@ -467,7 +474,7 @@ window.addEventListener('resize', function (e) {
 
 // DRAG AND DROP FILES
 
-
+ui.main = ui.main || document.querySelector('#main')
 
 ui.main.addEventListener('dragenter', function (e) {
     if (e.dataTransfer.types.indexOf('Files')<0) return
@@ -506,9 +513,10 @@ window.addEventListener('keydown', function (e) {
     e.preventDefault()
     var control = (/mac/i.test(navigator.platform) && e.metaKey) || e.ctrlKey
     if (!ui.current) return
-    if (e.altKey && e.key == '[') ui.selectTabs(ui.current.previousSibling || ui.current.parentNode.lastChild)
-    else if (e.altKey && e.key == ']') ui.selectTabs(ui.current.nextSibling || ui.current.parentNode.firstChild)
-    else if (e.altKey && e.key == '\\') ui.selectTabs(ui.last || ui.current)
+    // remove alt key as modifier for tab navigation--no need
+    if (e.key == '[') ui.selectTabs(ui.current.previousSibling || ui.current.parentNode.lastChild)
+    else if (e.key == ']') ui.selectTabs(ui.current.nextSibling || ui.current.parentNode.firstChild)
+    else if (e.key == '\\') ui.selectTabs(ui.last || ui.current)
     //else if (e.altKey && /[0-9]/.test(e.key)) ui.selectTabs(getTabRef(+e.key))
     else if (e.altKey && /w/i.test(e.key)) ui.closeTabs()
 })
@@ -516,7 +524,11 @@ window.addEventListener('keydown', function (e) {
 
 
 
-// load up existing session if one exists
+
+// LOAD EXISTING SESSION IF IT EXISTS
+
+
+
 if (data.sheets.length) {
     for (var i=0; i<data.sheets.length; i++) {
         ui.newTab(data.sheets[i])
