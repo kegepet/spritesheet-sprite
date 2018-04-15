@@ -406,7 +406,7 @@ ui.tabScroller.addEventListener('mouseover', function (e) {
     this.className = this.className.replace(/ *on/g,'') + (this.className ? ' on' : 'on')
 })
 ui.tabScroller.addEventListener('mouseout', function (e) {
-    if (ui.tabScroller.knob.active) {
+    if (ui.tabScroller.active) {
         ui.tabScroller.timeout = setTimeout(arguments.callee,500)
         return
     }
@@ -423,7 +423,7 @@ ui.tabScroller.knob.addEventListener('mousedown', function (e) {
     var tabsW = parseInt(ui.tabs.style.width)
     var offsetX = e.offsetX
     var maxScroll = tabsW - ui.tabsMainW
-    knob.active = true
+    ui.tabScroller.active = true
     var mm = function (e) {
         e.preventDefault()
         if (knob.anim) return
@@ -437,9 +437,37 @@ ui.tabScroller.knob.addEventListener('mousedown', function (e) {
     }
     window.addEventListener('mousemove', mm)
     window.addEventListener('mouseup', function (e) {
-        if (!knob.active) return
-        knob.active = false
+        if (!ui.tabScroller.active) return
+        ui.tabScroller.active = false
         window.removeEventListener('mousemove', mm)
+        window.removeEventListener('mouseup', arguments.callee)
+    })
+})
+
+ui.tabScroller.bar.addEventListener('mousedown', function (e) {
+    if (e.target != this) return
+    ui.tabScroller.active = true
+    var hot = true // determines whether mouse is in the activation area
+    var barW = ui.tabScroller.barW
+    var tabsW = parseInt(ui.tabs.style.width)
+    var scrollTo = (tabsW - ui.tabsMainW) * (e.offsetX / barW)
+    var marginX = ui.tabs.querySelector('.tab').x.call(this)
+    var trackX = function (e) {
+        hot = (e.target == ui.tabScroller.bar) || ui.tabScroller.bar.contains(e.target)
+        e.preventDefault()
+        scrollTo = (tabsW - ui.tabsMainW) * ((e.clientX - marginX) / barW)
+    }
+    window.requestAnimationFrame(function (ts) {
+        if (hot) {
+            var vector = scrollTo - ui.tabsMain.scrollLeft
+            ui.tabsMain.scrollLeft += ((vector / Math.abs(vector)) || 0) * Math.min(Math.abs(vector),20)
+        }
+        ui.tabScroller.active && window.requestAnimationFrame(arguments.callee)
+    })
+    window.addEventListener('mousemove', trackX)
+    window.addEventListener('mouseup', function (e) {
+        ui.tabScroller.active = false
+        window.removeEventListener('mousemove', trackX)
         window.removeEventListener('mouseup', arguments.callee)
     })
 })
