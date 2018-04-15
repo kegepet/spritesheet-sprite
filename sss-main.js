@@ -407,7 +407,7 @@ ui.tabScroller.addEventListener('mouseover', function (e) {
 })
 ui.tabScroller.addEventListener('mouseout', function (e) {
     if (ui.tabScroller.knob.active) {
-        setTimeout(arguments.callee,500)
+        ui.tabScroller.timeout = setTimeout(arguments.callee,500)
         return
     }
     ui.tabScroller.timeout = setTimeout(function () {
