@@ -214,7 +214,7 @@ ui.switchTab = function (tab, skipLast=false) {
 }
 
 ui.closeTabs = function (tab=null) {
-    var toX = tab ? [tab] : document.body.querySelectorAll('.tab.selected')
+    var toX = tab ? [tab] : ui.tabs.querySelectorAll('.tab.selected')
     if (!toX) return
     var newCur = toX[toX.length-1].nextSibling || toX[0].previousSibling
     for (var i=0, item; item=toX[i]; i++) {
@@ -223,15 +223,16 @@ ui.closeTabs = function (tab=null) {
         item.parentNode.removeChild(item)
     }
     // move to new positions
-    var tabs = document.body.querySelectorAll('.tab')
+    var tabs = ui.tabs.querySelectorAll('.tab')
     for (var i=0, item; item=tabs[i]; i++) {
         item.x(i * ui.tabW)
     }
     ui.tabs.style.width = tabs.length * ui.tabW + 'px'
     ui.current = ui.current.parentNode ? ui.current : null
+    if (ui.current) return
     // and in case there is no previousSibling either...
-    newCur = newCur || document.body.querySelector('.tab')
-    newCur && ui.selectTabs(newCur)
+    newCur = ui.tabs.querySelector('.tab.selected') || newCur || ui.tabs.querySelector('.tab')
+    newCur && ui.selectTabs(newCur, false)
 }
 
 
@@ -332,7 +333,7 @@ ui.arrangeTabs = function (e) {
 }
 
 
-ui.selectTabs = function (x) {
+ui.selectTabs = function (x, deselect=true) {
     // x can be either a MouseEvent or a reference to a tab
     var me = x.constructor == MouseEvent
     var target = me ? x.target : x
@@ -347,7 +348,7 @@ ui.selectTabs = function (x) {
     // only arrangeTabs does anything in that case
     if (me && x.type=='mousedown' && !ck && !sk && selected) return
     if (me && x.type=='mouseup' && !(selected && !ck && !sk)) return
-    if (!me || !ck) {
+    if (deselect && (!me || !ck)) {
         for (var i=0, item; item=tabs[i]; i++) {
             item.setClass('selected', false)
         }
