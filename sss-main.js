@@ -1,36 +1,24 @@
 data = {}
 data.sheets = []
-data.Sheet = function () { // each element in data.sheets has its prototype set to this
-    this.image = {
-        data: '', // base64-encoded image data
-        path: '', // path must be provided manually by user
-        name: '',
-        type: '',
-        size: ''
-    }
-    /*
-    The next three are relational.
-    e.g.
-    a sprite might be a member of several states
-    a frame might be a member of several states
-    a state might be a member of several sprites or frames
-
-    These relationships are stored as ref properties in their respective
-    container objects in the form of indices within the other lists.
-    */
-    this.persistent = true, // whether localstorage should store the image data
-    this.sprites = [] // all sprites and member data in current sheet
-    this.states = []  // all different states among different sprites 
-    this.frames = []  // all different frames among different states
-    this.grid_distance = 100
-    this.grid_on = true
-    this.guidelines_h = []
-    this.guidelines_v = []
-    this.guidelines_on = true
+data.Sheet = function (ob={}) { // each element in data.sheets has its prototype set to this
+    (function (source, target) {
+        for (var i in source) {
+          if (source[i].constructor == Array ||
+            source[i].constructor == Object) {
+              target[i] = new source[i].constructor()
+              arguments.callee(source[i], target[i])
+          }
+          else target[i] = source[i]
+        }
+    })(ob, this)
 }
-data.Sheet.prototype.update = function (k, v) {
-    this[k] = v
-    data.mtime = Date.now()
+// using 'q' as a synonym for update (stands for query)
+data.Sheet.prototype.q = data.Sheet.prototype.update = function (k, v) {
+    if (v) {
+        this[k] = v
+        data.mtime = Date.now()
+    }
+    return this[k]
 }
 data.add = function (file, callback) {
     var s = data.sheets[data.sheets.push(new data.Sheet())-1]
@@ -65,7 +53,7 @@ data.save = function () {
     data.timeout = setTimeout(data.save, 5000)
     if (data.mtime <= data.stime) return
     try {
-        localStorage.setItem('spritesheet-sprite', JSON.stringify(data.sheets))
+        localStorage.setItem('spritesheets', JSON.stringify(data.sheets))
         data.stime = Date.now()
     }
     catch (e) {
@@ -78,11 +66,15 @@ data.init = function () {
     // create localStorage object if one does not exist
     // fetch data from localStorage
     // populate data.sheets
-    if (!('spritesheet-sprite' in localStorage)) {
-        localStorage.setItem('spritesheet-sprite', '')
+    if (!('spritesheets' in localStorage)) {
+        localStorage.setItem('spritesheets', '')
     }
     try {
-        data.sheets = JSON.parse(localStorage.getItem('spritesheet-sprite'))
+        var temp = JSON.parse(localStorage.getItem('spritesheets'))
+        // data.sheets must be data.Sheet objects, not generic objects
+        for (var i=0; i<temp.length; i++) {
+            data.sheets.push(new data.Sheet(temp[i]))
+        }
     }
     catch (err) {
         data.sheets = []
@@ -98,15 +90,21 @@ ui = window.ui || {}
 
 
 
+
 // UTILITY
 
+
+HTMLElement.prototype.setClass = function (classname, tf=true) {
+    this.className = this.className.replace(new RegExp(' *'+classname, 'g'), '')
+    if (tf) this.className += this.className ? ' '+classname : classname
+}
 
 ui.openAlert = function (template_id, ttl=0) {
     // ttl set to 0 (secs) will not timeout (default)
     // clicking on the alert, hitting esc, or the X will close the alert
     var ov = document.querySelector('template#overlays').content.querySelector('#'+template_id).cloneNode(true)
     ov.remove = function () {
-        this.className += ' off'
+        this.setClass('off')
     }
     ov.addEventListener('transitionend', function (e) {
         ov.parentNode.removeChild(ov)
@@ -119,22 +117,25 @@ ui.openModal = function (message, choices, callback, context=document.body) {
     // choices is an array with each item a button value
     // the callback will be passed the selected index from the choices array
     var o = document.createElement('div')
-    o.className = 'overlay'
+    o.setClass('overlay')
     var m = document.createElement('div')
-    m.className = 'modal'
+    m.setClass('modal')
     o.appendChild(m)
     var mm = document.createElement('div')
-    mm.className = 'message'
+    mm.setClass('message')
     mm.innerText = message
     m.appendChild(mm)
     for (var i=0; i < choices.length; i++) {
         var b = document.createElement('div')
-        b.className = 'choice'
+        b.setClass('choice')
         b.choice = i;
         b.innerText = choices[i]
         b.addEventListener('click', function (e) {
             callback(this.choice)
-            o.className += ' off'
+            o.setClass('off')
+            o.addEventListener('transitionend', function (e) {
+                o.parentNode.removeChild(this)
+            })
         })
         m.appendChild(b)
     }
@@ -156,7 +157,7 @@ ui.newTab = function (x) {
     document.querySelector('#sheets').appendChild(s)
     // create new tab
     var t = document.createElement('div')
-    t.className = 'tab'
+    t.setClass('tab')
     // tab and sheet should hold reference to one another
     t.sheet = s
     s.tab = t
@@ -166,10 +167,6 @@ ui.newTab = function (x) {
         ui.arrangeTabs(e)
     })
     t.addEventListener('mouseup', ui.selectTabs)
-    s.setClass = t.setClass = function (classname, tf) {
-        this.className = this.className.replace(new RegExp(' *'+classname, 'g'), '')
-        if (tf) this.className += this.className ? ' '+classname : classname
-    }
     t.x = function (to=null) {
         if (to != null) {
             this.int_x = to
@@ -381,12 +378,12 @@ ui.selectTabs = function (x, deselect=true) {
 
 ui.tabsMain = ui.tabsMain || document.body.querySelector('#tabs-main')
 ui.tabs = ui.tabs || document.querySelector('#tabs')
-ui.tabScroller = document.body.querySelector('#tab-scroller')
-ui.tabScroller.bar = ui.tabScroller.querySelector('.bar')
-ui.tabScroller.knob = ui.tabScroller.querySelector('.knob')
+ui.tabScrollbar = document.body.querySelector('#tab-scrollbar')
+ui.tabScrollbar.track = ui.tabScrollbar.querySelector('.track')
+ui.tabScrollbar.thumb = ui.tabScrollbar.querySelector('.thumb')
 ui.tabsMainW = parseInt(window.getComputedStyle(ui.tabsMain).width)
-ui.tabScroller.barW = parseInt(window.getComputedStyle(ui.tabScroller.bar).width)
-ui.tabScroller.barX = parseInt(window.getComputedStyle(ui.tabScroller.bar).left)
+ui.tabScrollbar.trackW = parseInt(window.getComputedStyle(ui.tabScrollbar.track).width)
+ui.tabScrollbar.trackX = parseInt(window.getComputedStyle(ui.tabScrollbar.track).left)
 
 ui.tabsMain.addEventListener('wheel', function (e) {
     //console.log('deltaMode is ' + e.deltaMode + ', deltaX is ' + e.deltaX + ', deltaY is ' + e.deltaY)
@@ -401,73 +398,73 @@ ui.tabsMain.addEventListener('wheel', function (e) {
     e.preventDefault()
 })
 
-ui.tabScroller.addEventListener('mouseover', function (e) {
+ui.tabScrollbar.addEventListener('mouseover', function (e) {
     if (!ui.tabs.hasChildNodes() || parseInt(ui.tabs.style.width) <= ui.tabsMainW) return
-    ui.tabScroller.timeout = clearTimeout(ui.tabScroller.timeout)
-    this.className = this.className.replace(/ *on/g,'') + (this.className ? ' on' : 'on')
+    ui.tabScrollbar.timeout = clearTimeout(ui.tabScrollbar.timeout)
+    this.setClass('on')
 })
-ui.tabScroller.addEventListener('mouseout', function (e) {
-    if (ui.tabScroller.active) {
-        ui.tabScroller.timeout = setTimeout(arguments.callee,500)
+ui.tabScrollbar.addEventListener('mouseout', function (e) {
+    if (ui.tabScrollbar.active) {
+        ui.tabScrollbar.timeout = setTimeout(arguments.callee,500)
         return
     }
-    ui.tabScroller.timeout = setTimeout(function () {
-    ui.tabScroller.className = ui.tabScroller.className.replace(/ *on/g,'')
+    ui.tabScrollbar.timeout = setTimeout(function () {
+    ui.tabScrollbar.setClass('on',false)
     },2000)
 })
 
-ui.tabScroller.knob.addEventListener('mousedown', function (e) {
-    var barW = ui.tabScroller.barW
-    var barX = ui.tabScroller.barX
-    var knob = ui.tabScroller.knob
-    var knobW = parseInt(window.getComputedStyle(ui.tabScroller.knob).width)
+ui.tabScrollbar.thumb.addEventListener('mousedown', function (e) {
+    var trackW = ui.tabScrollbar.trackW
+    var trackX = ui.tabScrollbar.trackX
+    var thumb = ui.tabScrollbar.thumb
+    var thumbW = parseInt(window.getComputedStyle(ui.tabScrollbar.thumb).width)
     var tabsW = parseInt(ui.tabs.style.width)
     var offsetX = e.offsetX
     var maxScroll = tabsW - ui.tabsMainW
-    ui.tabScroller.active = true
+    ui.tabScrollbar.active = true
     var mm = function (e) {
         e.preventDefault()
-        if (knob.anim) return
-        knob.anim = true
+        if (thumb.anim) return
+        thumb.anim = true
         window.requestAnimationFrame(function () {
-            var x = Math.max(0,Math.min(barW-knobW, e.clientX - barX - offsetX))
-            knob.style.left = x + 'px'
-            ui.tabsMain.scrollLeft = maxScroll * (x / (barW - knobW))
-            knob.anim = false
+            var x = Math.max(0,Math.min(trackW-thumbW, e.clientX - trackX - offsetX))
+            thumb.style.left = x + 'px'
+            ui.tabsMain.scrollLeft = maxScroll * (x / (trackW - thumbW))
+            thumb.anim = false
         })
     }
     window.addEventListener('mousemove', mm)
     window.addEventListener('mouseup', function (e) {
-        if (!ui.tabScroller.active) return
-        ui.tabScroller.active = false
+        if (!ui.tabScrollbar.active) return
+        ui.tabScrollbar.active = false
         window.removeEventListener('mousemove', mm)
         window.removeEventListener('mouseup', arguments.callee)
     })
 })
 
-ui.tabScroller.bar.addEventListener('mousedown', function (e) {
+ui.tabScrollbar.track.addEventListener('mousedown', function (e) {
     if (e.target != this) return
-    ui.tabScroller.active = true
+    ui.tabScrollbar.active = true
     var hot = true // determines whether mouse is in the activation area
-    var barW = ui.tabScroller.barW
+    var trackW = ui.tabScrollbar.trackW
     var tabsW = parseInt(ui.tabs.style.width)
-    var scrollTo = (tabsW - ui.tabsMainW) * (e.offsetX / barW)
+    var scrollTo = (tabsW - ui.tabsMainW) * (e.offsetX / trackW)
     var marginX = ui.tabs.querySelector('.tab').x.call(this)
     var trackX = function (e) {
-        hot = (e.target == ui.tabScroller.bar) || ui.tabScroller.bar.contains(e.target)
+        hot = (e.target == ui.tabScrollbar.track) || ui.tabScrollbar.track.contains(e.target)
         e.preventDefault()
-        scrollTo = (tabsW - ui.tabsMainW) * ((e.clientX - marginX) / barW)
+        scrollTo = (tabsW - ui.tabsMainW) * ((e.clientX - marginX) / trackW)
     }
     window.requestAnimationFrame(function (ts) {
         if (hot) {
             var vector = scrollTo - ui.tabsMain.scrollLeft
             ui.tabsMain.scrollLeft += ((vector / Math.abs(vector)) || 0) * Math.min(Math.abs(vector),20)
         }
-        ui.tabScroller.active && window.requestAnimationFrame(arguments.callee)
+        ui.tabScrollbar.active && window.requestAnimationFrame(arguments.callee)
     })
     window.addEventListener('mousemove', trackX)
     window.addEventListener('mouseup', function (e) {
-        ui.tabScroller.active = false
+        ui.tabScrollbar.active = false
         window.removeEventListener('mousemove', trackX)
         window.removeEventListener('mouseup', arguments.callee)
     })
@@ -478,15 +475,15 @@ ui.resetScrollbar = function (e) {
     if (ui.resettingScrollbar) return
     ui.resettingScrollbar = true
     window.requestAnimationFrame(function () {
-        var barW = ui.tabScroller.barW
-        var knob = ui.tabScroller.knob
-        knob.initW = knob.initW || parseInt(window.getComputedStyle(knob).width)
+        var trackW = ui.tabScrollbar.trackW
+        var thumb = ui.tabScrollbar.thumb
+        thumb.initW = thumb.initW || parseInt(window.getComputedStyle(thumb).width)
         var tabsW = parseInt(ui.tabs.style.width)
-        // adjust knob size
-        knobW = Math.max(knob.initW,Math.min(barW,barW*(ui.tabsMainW/tabsW)))
+        // adjust thumb size
+        thumbW = Math.max(thumb.initW,Math.min(trackW,trackW*(ui.tabsMainW/tabsW)))
         var ratioScrolled = ui.tabsMain.scrollLeft / (tabsW - ui.tabsMainW)
-        knob.style.width = knobW + 'px'
-        knob.style.left = (barW - knobW) * ratioScrolled + 'px'
+        thumb.style.width = thumbW + 'px'
+        thumb.style.left = (trackW - thumbW) * ratioScrolled + 'px'
         ui.resettingScrollbar = false
     })
 }
@@ -494,7 +491,7 @@ ui.resetScrollbar = function (e) {
 ui.tabsMain.addEventListener('scroll', ui.resetScrollbar)
 window.addEventListener('resize', function (e) {
     ui.tabsMainW = parseInt(window.getComputedStyle(ui.tabsMain).width)
-    ui.tabScroller.barW = parseInt(window.getComputedStyle(ui.tabScroller.bar).width)
+    ui.tabScrollbar.trackW = parseInt(window.getComputedStyle(ui.tabScrollbar.track).width)
     ui.resetScrollbar()
 })
 
