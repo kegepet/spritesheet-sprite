@@ -1,6 +1,6 @@
 data = {}
 data.sheets = []
-data.Sheet = function (ob={}) { // each element in data.sheets has its prototype set to this
+data.Sheet = function (ob={}) { // data.sheets stores instances of data.Sheet
     (function (source, target) {
         for (var i in source) {
           if (source[i].constructor == Array ||
@@ -48,10 +48,10 @@ data.reorder = function (sheetsTo) {
 }
 data.mtime = Date.now() // the modified time of the data.sheets
 data.stime = data.mtime // the last time saved
-data.save = function () {
+data.save = function (force=false) {
     data.timeout && clearTimeout(data.timeout)
     data.timeout = setTimeout(data.save, 5000)
-    if (data.mtime <= data.stime) return
+    if (!force && data.mtime <= data.stime) return
     try {
         localStorage.setItem('spritesheets', JSON.stringify(data.sheets))
         data.stime = Date.now()
@@ -535,7 +535,7 @@ ui.main.addEventListener('drop', function (e) {
 
 window.addEventListener('keydown', function (e) {
     // check reserved
-    if (!/[\[\]\\w]/i.test(e.key)) return
+    if (!/[\[\]\\wW0-9]/.test(e.key)) return
     e.preventDefault()
     var control = (/mac/i.test(navigator.platform) && e.metaKey) || e.ctrlKey
     if (!ui.current) return
@@ -543,7 +543,8 @@ window.addEventListener('keydown', function (e) {
     if (e.key == '[') ui.selectTabs(ui.current.previousSibling || ui.current.parentNode.lastChild)
     else if (e.key == ']') ui.selectTabs(ui.current.nextSibling || ui.current.parentNode.firstChild)
     else if (e.key == '\\') ui.selectTabs(ui.last || ui.current)
-    //else if (e.altKey && /[0-9]/.test(e.key)) ui.selectTabs(getTabRef(+e.key))
+    else if (e.altKey && /[1-9]/.test(e.key)) ui.selectTabs(ui.tabs.childNodes[+e.key-1])
+    else if (e.altKey && e.key == '0') ui.switchTab(ui.current, true) // brings tab into view
     else if (e.altKey && /w/i.test(e.key)) ui.closeTabs()
 })
 
@@ -551,12 +552,24 @@ window.addEventListener('keydown', function (e) {
 
 
 
-// LOAD EXISTING SESSION IF IT EXISTS
+// SAVE AND LOAD EXISTING SESSION
 
 
+
+localStorage.setItem('current', localStorage.getItem('current') || 0)
+
+window.addEventListener('beforeunload', function (e) {
+    for (var i=0; i<ui.tabs.childNodes.length; i++) {
+        if (ui.current==ui.tabs.childNodes[i]) break
+    }
+    localStorage.setItem('current', i)
+    data.save(true)
+})
 
 if (data.sheets.length) {
     for (var i=0; i<data.sheets.length; i++) {
         ui.newTab(data.sheets[i])
     }
+    var ct = localStorage.getItem('current')
+    if (ct != null) ui.selectTabs(ui.tabs.childNodes[+ct])
 }

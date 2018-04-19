@@ -7,6 +7,7 @@ HTMLElement.prototype.setClass = function (classname, tf) {
 }
 
 ui.sheet = {}
+ui.sheet.activeTools = []
 
 ui.sheet.global = {}
 ui.sheet.global.init = function () {
@@ -23,9 +24,9 @@ ui.sheet.global.init = function () {
     var img = cnv.img
     img.initW = img.width // save initial values
     img.initH = img.height
-    var margin = 20 // so the image is not pinned up against the edges
-    var stgW = cnv.width - margin
-    var stgH = cnv.height - margin
+    var padding = 20 // so the image is not pinned up against the edges
+    var stgW = cnv.width - padding
+    var stgH = cnv.height - padding
     var zoom = this.data.q('zoom') || function () {
         var wd = stgW - img.initW // width difference
         var hd = stgH - img.initH // height difference
@@ -44,11 +45,81 @@ ui.sheet.canvas = {}
 ui.sheet.canvas.width
 ui.sheet.canvas.height
 
- 
+
+ui.sheet.canvas.onmousedown = function (e) {
+    if (!'onmousedown' in ui.sheet.activeTools[0]) return
+    ui.sheet.activeTools[0].onmousedown.call(this, e)
+}
+ui.sheet.canvas.onmousemove = function (e) {
+    if (!'onmousemove' in ui.sheet.activeTools[0]) return
+    if (ui.sheet.canvas.mmActive) return
+    ui.sheet.canvas.mmActive = true
+    window.requestAnimationFrame(function () {
+        ui.sheet.activeTools[0].onmousemove.call(this, e)
+        ui.sheet.canvas.mmActive = false
+    })
+}
+ui.sheet.canvas.onmouseup = function (e) {
+    if (!'onmouseup' in ui.sheet.activeTools[0]) return
+    ui.sheet.activeTools[0].onmouseup.call(this, e)
+}
+ui.sheet.canvas.onwheel = function (e) {
+    if (!'onwheel' in ui.sheet.activeTools[0]) return
+    ui.sheet.activeTools[0].onwheel.call(this, e)
+}
+ui.sheet.canvas.onkeydown = function (e) {
+    if (!'onkeydown' in ui.sheet.activeTools[0]) return
+    ui.sheet.activeTools[0].onkeydown.call(this, e)
+}
 
 
+// TOOLS
 
-//the create function is a factory function
+/*
+All the event handlers in the canvas above will simply relay the
+messages to the currently active tool in the active tool stack.
+
+e.g. If the "rect" tool is active, the mousedown and mousemove
+will simply relay the messages to the "rect" tool's handlers.
+
+Holding spacebar down will temporarily activate the "pan" tool, and
+the "pan" tool will receive the events.
+
+A tool must meet certain specifications:
+1. a self-calling init() function which does any prepwork and registers itself
+   with the tool registry.
+2. handlers for all events received by the canvas, whether or not they will
+   be used by the tool. Tools may also relay handlers to other tools, as in the
+   case of the snapping tool.
+3. 
+
+*/
+ui.sheet.tools = ui.sheet.tools || [] // external tools can also be created
+
+// default nothing tool
+ui.sheet.tools.push({
+    onmousedown: function (e) {
+        console.log(e.button)
+    },
+    onmousemove: function (e) {
+        //console.log(e.offsetX + ', ' + e.offsetY)
+    },
+    onmouseup: function (e) {
+        return
+    },
+    onkeydown: function (e) {
+        return
+    },
+    onwheel: function (e) {
+        return
+    }
+})
+
+
+ui.sheet.activeTools.push(ui.sheet.tools[0])
+
+
+// ENTRY POINT FOR NEW DOCUMENT
 
 
 ui.sheet.create = function (dataref) {

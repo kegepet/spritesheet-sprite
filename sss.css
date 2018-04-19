@@ -8,6 +8,11 @@ body {
 }
 body * {
     box-sizing: border-box;
+    cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 }
 .overlay, #main {
     position: absolute;
@@ -18,7 +23,7 @@ body * {
     min-width: 800px;
 }
 .overlay {
-    background-color: blue;
+    background-color: rgba(0,0,0,0.7);
     transition: opacity 0.2s;
     transition-timing-function : ease-in;
     z-index: 99; /* will prevent interference with selected tabs (z-index: 2) */
@@ -26,25 +31,34 @@ body * {
 .overlay.off {
     opacity: 0
 }
-.overlay#filedrop {
-    pointer-events: none;
-}
 .overlay > * { /* this should center any content of an overlay */
+    position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
     margin: auto;
 }
+.overlay#filedrop {
+    pointer-events: none;
+}
+.overlay#filedrop .message {
+    color: white;
+    font-size: 1.3em;
+    line-height: 100%;
+    width: 400px;
+    height: 60px;
+    text-align: center;
+}
 .modal {
     width: 400px;
     height: 130px;
     background-color: purple;
     padding: 10px 20px;
-    position: absolute;
     text-align: right;
 }
 .modal * {
+    position: relative !important;/* to prevent things from changing in certain contexts */
     display: inline-block;
 }
 .modal .message {
@@ -55,9 +69,10 @@ body * {
     text-align: left;
 }
 .modal .choice {
-    width: 80px;
-    height: 30px;
+    min-width: 80px;
+    padding: 4px 10px;
     margin: 2px 5px;
+    line-height: 1em;
     background-color: #dbb7ff;
     text-align: center;
     color: black;
@@ -151,11 +166,6 @@ body * {
     text-overflow: ellipsis;
     overflow: hidden;
     white-space: nowrap;
-    cursor: default;
-    user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
     background: linear-gradient(225deg,transparent 4px, #686868 0);
     z-index: 1;
     /*border-radius: 7px 7px 0 0;*/
@@ -177,7 +187,6 @@ body * {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #474747;
 }
 .sheet {
     position: relative;
@@ -212,21 +221,12 @@ body * {
 .sheet img.checkerbg {
     background-image: url('images/checkerboard-tile-bg.png')
 }
-
-
-
-
-
-
-
-
 .panel {
     position: absolute;
     right: 0;
     top: 0;
     bottom: 0;
-    width: 200px;
-    border-left-style: solid;
-    border-left-width: 1px;
+    width: 199px;
+    background-color: #474747;
 }
 
