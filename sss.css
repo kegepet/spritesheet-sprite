@@ -13,6 +13,7 @@ body * {
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
+    outline: none;
 }
 .overlay, #main {
     position: absolute;
@@ -199,7 +200,7 @@ body * {
 .sheet > * {
     box-sizing: content-box;
 }
-.canvas {
+.surface {
     overflow: hidden;
     position: absolute;
     left: 0;
@@ -208,7 +209,7 @@ body * {
     bottom: 0;
     background-image: url('images/diag-tile-bg.png');
 }
-.canvas * {
+.surface * {
     position: absolute;
 }
 .sheet img {
@@ -221,12 +222,67 @@ body * {
 .sheet img.checkerbg {
     background-image: url('images/checkerboard-tile-bg.png')
 }
+.divider {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    /* overlaps surface and panel by two pixels */
+    width: 5px;
+    right: 197px;
+    cursor: ew-resize;
+}
 .panel {
     position: absolute;
+    width: 201px;
     right: 0;
     top: 0;
     bottom: 0;
-    width: 199px;
     background-color: #474747;
 }
+.tool-options {
+    position: relative;
+    margin: 15px 10px 0;
+    padding-top: 15px;
+    background-color: #555;
+}
+.tool-options label {
 
+}
+#zoom-options label {
+    position: absolute;
+    top: -0.5em;
+    left: 15px;
+    background-color: #474747;
+    color: #999;
+    padding: 1px 3px;
+    text-transform: uppercase;
+    font-size: 0.9em;
+}
+
+
+
+/* tool specific */
+
+.rulers {
+    position: absolute;
+    background-color: black;/*rgba(0,0,0,0.8);*/
+    font-smooth: never;
+    -webkit-font-smoothing: none;
+}
+.rulers.on {
+    display: block;
+}
+.rulers.off {
+    display: none;
+}
+
+#ruler-x {
+    right: 0;
+    height: 17px;
+    left: 17px;
+}
+#ruler-y {
+    width: 17px;
+    top: 17px;
+    bottom: 0;
+}

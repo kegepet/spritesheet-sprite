@@ -556,13 +556,14 @@ window.addEventListener('keydown', function (e) {
 
 
 
-localStorage.setItem('current', localStorage.getItem('current') || 0)
-
 window.addEventListener('beforeunload', function (e) {
-    for (var i=0; i<ui.tabs.childNodes.length; i++) {
-        if (ui.current==ui.tabs.childNodes[i]) break
+    for (var i=0, c=l=null; i<ui.tabs.childNodes.length; i++) {
+        if (ui.current==ui.tabs.childNodes[i]) c = i
+        else if (ui.last==ui.tabs.childNodes[i]) l = i
     }
-    localStorage.setItem('current', i)
+    c!==null ? localStorage.setItem('current', c) : localStorage.removeItem('current')
+    l!==null ? localStorage.setItem('last', l) : localStorage.removeItem('last')
+    // save current session before quitting
     data.save(true)
 })
 
@@ -571,5 +572,8 @@ if (data.sheets.length) {
         ui.newTab(data.sheets[i])
     }
     var ct = localStorage.getItem('current')
-    if (ct != null) ui.selectTabs(ui.tabs.childNodes[+ct])
+    if (ct!==null) ui.selectTabs(ui.tabs.childNodes[+ct])
+    // now overwrite last tab
+    var lt = localStorage.getItem('last')
+    if (lt!==null) ui.last = ui.tabs.childNodes[+lt]
 }
